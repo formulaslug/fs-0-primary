@@ -98,6 +98,7 @@ void loop() {
       // wait to move to HV_STARTUP
       if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
         vehicle.i = 0;
+        vehicle.ledTime = 200;
         vehicle.state = HV_STARTUP;
       }
       break;
@@ -106,6 +107,7 @@ void loop() {
     case HV_STARTUP:
       // toggle (invert) HV led during startup
       vehicle.leds[YELLOW] = ~vehicle.leds[YELLOW];
+      vehicle.ledTime -= 8;
       // temp artificial timer for startup
       if (vehicle.i >= 20) {
         vehicle.i = 0;
@@ -118,7 +120,10 @@ void loop() {
       // wait to move to RTD_STARTUP until user input
       if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
         vehicle.i = 0;
+        vehicle.ledTime = 200;
         vehicle.state = RTD_STARTUP;
+      } else {
+        // Or move back to LV active
       }
       break;
     case RTD_SD:
@@ -126,6 +131,7 @@ void loop() {
     case RTD_STARTUP:
       // toggle (invert) RTD led during startup
       vehicle.leds[RED] = ~vehicle.leds[RED];
+      vehicle.ledTime -= 8;
       // temp artificial timer for startup
       if (vehicle.i >= 20) {
         vehicle.i = 0;
@@ -134,9 +140,10 @@ void loop() {
       break;
     case RTD_ACTIVE:
       // show entire system is hot
-      if (vehicle.i == 0) {
+      if (vehicle.i <= 1) {
         vehicle.leds[RED] = ON;
         vehicle.ledTime = 20;
+        /* vehicle.ledTime = 20; */
       } else if (vehicle.i < 20) {
         vehicle.leds[BLUE] = ~vehicle.leds[BLUE];
         vehicle.leds[YELLOW] = ~vehicle.leds[YELLOW];
@@ -158,8 +165,9 @@ void loop() {
     }
   }
 
-  // add some delay for visual effects
-  delay(50);//vehicle.ledTime
+  // add some delay for temporary visual effects
+  delay(vehicle.ledTime); // vehicle.ledTime
+  // an incrementor for num cycles awareness in FSM
   (vehicle.i)++;
 }
 
