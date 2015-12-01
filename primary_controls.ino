@@ -10,13 +10,14 @@
 // User libraries
 
 // Pre-proc. Dirs.
-#define NUM_LEDS 4
+#define NUM_LEDS 5
 #define NUM_BUTTONS 2
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
 #define false 0x00
 #define ON 0xff
 #define OFF 0x0
+#define TORQUE_INPUT A9
 enum States {
   LV_STARTUP,
   LV_ACTIVE,
@@ -31,7 +32,8 @@ enum Leds {
   BLUE,
   YELLOW,
   RED,
-  STATUS
+  STATUS,
+  SPEED
 };
 enum Buttons {
   HV_TOGGLE,
@@ -44,17 +46,20 @@ typedef struct Vehicle { // the main attributes of the vehicle
   uint8_t leds[NUM_LEDS]; // led values are 0x0 or 0xff to allow for bit-wise not
   int i;
   int ledTime;
+  uint8_t topSpeed = 60;
 } Vehicle;
 
 // Globals
 Vehicle vehicle = {};
-const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13};
+const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
 const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
 
 // Main setup function
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
+  Serial.println("Setup Complete.");
+
   // init leds
   int i;
   for (i = 0; i < NUM_LEDS; i++) {
@@ -74,8 +79,7 @@ void setup() {
   // show setup complete
   vehicle.leds[STATUS] = ON;
   // output confirmation
-  Serial.println("Setup Complete.");
-}
+  }
 
 // Main control run loop
 void loop() {
@@ -95,6 +99,8 @@ void loop() {
     case LV_ACTIVE:
       // set the led to show LV is active
       vehicle.leds[BLUE] = ON;
+      vehicle.leds[YELLOW] = OFF;
+      vehicle.leds[RED] = OFF;
       // wait to move to HV_STARTUP
       if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
         vehicle.i = 0;
@@ -103,11 +109,20 @@ void loop() {
       }
       break;
     case HV_SD:
+      // toggle (invert) HV led during shutdown
+      vehicle.leds[YELLOW] = ~vehicle.leds[YELLOW];
+      vehicle.ledTime += 10;
+      // temp artificial timer for shutdown
+      if (vehicle.i >= 20) {
+        vehicle.i = 0;
+        vehicle.ledTime = 50;
+        vehicle.state = LV_ACTIVE;
+      }
       break;
     case HV_STARTUP:
       // toggle (invert) HV led during startup
       vehicle.leds[YELLOW] = ~vehicle.leds[YELLOW];
-      vehicle.ledTime -= 8;
+      vehicle.ledTime -= 10;
       // temp artificial timer for startup
       if (vehicle.i >= 20) {
         vehicle.i = 0;
@@ -116,22 +131,36 @@ void loop() {
       break;
     case HV_ACTIVE:
       // set the led to show LV is active
+      vehicle.leds[BLUE] = ON;
       vehicle.leds[YELLOW] = ON;
+      vehicle.leds[RED] = OFF;
       // wait to move to RTD_STARTUP until user input
       if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
         vehicle.i = 0;
         vehicle.ledTime = 200;
         vehicle.state = RTD_STARTUP;
-      } else {
+      } else if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
         // Or move back to LV active
+        vehicle.i = 0;
+        vehicle.ledTime = 20;
+        vehicle.state = HV_SD;
       }
       break;
     case RTD_SD:
+      // toggle (invert) RTD led during shutdown
+      vehicle.leds[RED] = ~vehicle.leds[RED];
+      vehicle.ledTime += 10;
+      // temp artificial timer for shutdown
+      if (vehicle.i >= 20) {
+        vehicle.i = 0;
+        vehicle.ledTime = 50;
+        vehicle.state = HV_ACTIVE;
+      }
       break;
     case RTD_STARTUP:
       // toggle (invert) RTD led during startup
       vehicle.leds[RED] = ~vehicle.leds[RED];
-      vehicle.ledTime -= 8;
+      vehicle.ledTime -= 10;
       // temp artificial timer for startup
       if (vehicle.i >= 20) {
         vehicle.i = 0;
@@ -141,6 +170,8 @@ void loop() {
     case RTD_ACTIVE:
       // show entire system is hot
       if (vehicle.i <= 1) {
+        vehicle.leds[BLUE] = ON;
+        vehicle.leds[YELLOW] = ON;
         vehicle.leds[RED] = ON;
         vehicle.ledTime = 20;
         /* vehicle.ledTime = 20; */
@@ -152,6 +183,20 @@ void loop() {
         vehicle.leds[BLUE] = ON;
         vehicle.leds[YELLOW] = ON;
         vehicle.leds[RED] = ON;
+        vehicle.ledTime = 50;
+      } else {
+        // get speed
+        vehicle.ledTime = (int)(analogRead(TORQUE_INPUT) / 2);
+        // show speed
+        vehicle.leds[SPEED] = ~vehicle.leds[SPEED];
+        // post activation
+        if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
+          // move back to HV_ACTIVE
+          vehicle.i = 0;
+          vehicle.ledTime = 20;
+          vehicle.leds[SPEED] = OFF;
+          vehicle.state = RTD_SD;
+        }
       }
       break;
   }
@@ -170,4 +215,5 @@ void loop() {
   // an incrementor for num cycles awareness in FSM
   (vehicle.i)++;
 }
+
 
