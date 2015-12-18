@@ -3,6 +3,11 @@
  * @desc Pimary control system for the UCSC's Formula Slug Electric FSAE Vehicle
  * @dict LV = Low Voltage System, HV = High Voltage System, RTD = Ready-To-Drive
  */
+
+
+// Rev notes: Need some button debounce
+
+
 // System libraries
 #include <stdint.h>
 #include <stdio.h>
@@ -12,6 +17,7 @@
 // Pre-proc. Dirs.
 #define NUM_LEDS 5
 #define NUM_BUTTONS 2
+#define NUM_LCD_DATA_PINS
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
 #define false 0x00
@@ -58,6 +64,7 @@ typedef struct Vehicle { // the main attributes of the vehicle
 Vehicle vehicle = {};
 const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
 const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
+const uint8_t lcdPinds[NUM_LCD_DATA_PINDS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
 
 // Main setup function
 void setup() {
