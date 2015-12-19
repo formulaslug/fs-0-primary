@@ -11,13 +11,21 @@
 // System libraries
 #include <stdint.h>
 #include <stdio.h>
+// LCD - T6963
+/* #include <U8glib.h> */
+#include "T6963.h"
+#include "gfxdata.h"
+#include "Times_New_Roman__14.h"
+
+T6963 LCD(240,64,6,32);// 240x64 Pixel and 6x8 Font
 
 // User libraries
 
 // Pre-proc. Dirs.
 #define NUM_LEDS 5
 #define NUM_BUTTONS 2
-#define NUM_LCD_DATA_PINS
+#define NUM_LCD_DATA_PINS 8
+#define LCD_BACKLIGHT_VIN_PIN 22
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
 #define false 0x00
@@ -64,7 +72,12 @@ typedef struct Vehicle { // the main attributes of the vehicle
 Vehicle vehicle = {};
 const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
 const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
-const uint8_t lcdPinds[NUM_LCD_DATA_PINDS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+const uint8_t teensy2LcdPins[NUM_LCD_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+const uint8_t lcdLighting[13] = {20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 150};
+
+// U8GLIB_T6963_240X64(d0, d1, d2, d3, d4, d5, d6, d7, cs, a0, wr, rd [, reset]);
+/* U8GLIB_T6963_240X64(teensy2LcdPins[0], teensy2LcdPins[1], teensy2LcdPins[2], teensy2LcdPins[3], teensy2LcdPins[4], teensy2LcdPins[5], teensy2LcdPins[6], teensy2LcdPins[7], 6, 9, 10, 11, 12); */
+
 
 // Main setup function
 void setup() {
@@ -72,30 +85,59 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Setup Complete.");
 
-  // init leds
+  // init leds pins
   int i;
   for (i = 0; i < NUM_LEDS; i++) {
     pinMode(ledPins[i], HIGH);
   }
-  // init buttons
+  // init buttons pins
   for (i = 0; i < NUM_BUTTONS; i++) {
     pinMode(buttonPins[i], INPUT);
   }
+
   // init the vehicle
   vehicle.state = LV_STARTUP;
   vehicle.i = 0;
-  vehicle.dynamics.torque = 50;
+  vehicle.dynamics.torque = 10;
   for (i = 0; i < NUM_LEDS; i++) {
     vehicle.leds[i] = OFF;
   }
   // show setup complete
   vehicle.leds[STATUS] = ON;
-  // output confirmation
+
+
+
+  // LCD STUFF
+  // init lcdPower
+  pinMode(LCD_BACKLIGHT_VIN_PIN, OUTPUT);
+  analogWrite(LCD_BACKLIGHT_VIN_PIN, 200);
+  delay(1000);
+  analogWrite(LCD_BACKLIGHT_VIN_PIN, 0);
+  
+  // init
+  LCD.Initialize();
+
+
 }
 
+int up = 1;
+int glb = 0;
+int length = 200;
 // Main control run loop
 void loop() {
   int i;
+  if (glb == length) {
+    up = 0;
+  } else if (glb == 0) {
+    up = true;
+  }
+  analogWrite(LCD_BACKLIGHT_VIN_PIN, 50+glb);
+
+  if (up) {
+    glb += 2;
+  } else {
+    glb -= 2;
+  }
 
   // Vehicle's main state machine (FSM)
   switch (vehicle.state) {
