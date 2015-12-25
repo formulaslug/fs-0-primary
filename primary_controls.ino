@@ -109,7 +109,7 @@ void setup() {
   vehicle.leds[STATUS_LED] = ON;
 
   // New LCD Stuff
-  LcdInit(240, 64, 6, 200, controlPins, dataPins, 22);
+  LcdInit(240, 64, 6, 75, controlPins, dataPins, 22);
 
 
 }
@@ -131,7 +131,7 @@ void loop() {
   // wait for lcd to heat up
   if (setupIncomplete) {
     if (!(statusByte & STATUS_READY)) {
-      statusByte = GetStatusByte(WRITE, DATA);
+      statusByte = LCDGetStatusByte(WRITE, DATA);
       Serial.print("Status: ");
       for (i = NUM_DATA_PINS; i >= 0; i--) {
         tmp = statusByte << (7-i);
@@ -139,10 +139,11 @@ void loop() {
         Serial.print(tmp);
       }
       Serial.println(".");
-      delay(1000);
     } else {
       Serial.println("Status: Ready");
       setupIncomplete = 0;
+      // inc brightness to operational level
+      LCDSetBrightness(250);
     }
   }
 

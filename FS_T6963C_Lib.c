@@ -55,7 +55,7 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   return 1;
 }
 
-Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD)
+Byte LCDGetStatusByte(uint8_t currentRW, uint8_t currentCD)
 {
   int i;
   // set mode
@@ -93,7 +93,7 @@ Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD)
   return byte;
 }
 
-void WriteChar(char c)
+void LCDWriteChar(char c)
 {
   int i;
   char bit;
@@ -103,6 +103,34 @@ void WriteChar(char c)
     digitalWrite(*(lcd.dataPins + i), bit);
   }
 }
+
+void LCDSetBrightness(uint8_t value)
+{
+  int i;
+  // return if no change
+  if (value == lcd.brightness) {
+    return;
+  }
+  // change brightness level by inc/dec.s of 1
+  if (value > lcd.brightness) {
+    for (i = (lcd.brightness + 1); i <= value; i++) {
+      analogWrite(lcd.backlightPin, i);
+      delay(5);
+    }
+  } else {
+    for (i = (lcd.brightness - 1); i >= value; i--) {
+      analogWrite(lcd.backlightPin, i);
+      delay(5);
+    }
+  }
+  // set new value
+  lcd.brightness = value;
+}
+
+
+
+
+
 
 /*PRIVATE FUNCTIONS*/
 void setMode(uint8_t RW, uint8_t CD)

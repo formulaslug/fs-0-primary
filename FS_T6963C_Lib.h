@@ -53,8 +53,9 @@ enum MODES {
  * @param pinout: An array of T6963C pins as indices (1-22) and Teensy pins as values
  */
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin);
-void WriteChar(char c);
-Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD);
+void LCDWriteChar(char c);
+Byte LCDGetStatusByte(uint8_t currentRW, uint8_t currentCD);
+void LCDSetBrightness(uint8_t value);
 
 
 #endif
