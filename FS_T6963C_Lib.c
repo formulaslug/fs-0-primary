@@ -26,24 +26,21 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
 
   /*CONTROLS*/
   // set digital outputs
-  pinMode(*(lcd.controlPins), HIGH); // WR
-  pinMode(*(lcd.controlPins + 1), HIGH); // RD
-  pinMode(*(lcd.controlPins + 2), HIGH); // CE
-  pinMode(*(lcd.controlPins + 3), HIGH); // CD
-  pinMode(*(lcd.controlPins + 4), HIGH); // RST
-  pinMode(*(lcd.controlPins + 5), HIGH); // FS
+  for (i = 0; i < NUM_CNTRL_PINS; i++) {
+    pinMode(*(lcd.controlPins + i), HIGH); // WR
+  }
   // init digital outputs
   // trigger reset
-  pinMode(*(lcd.controlPins + 4), LOW); // RST..start
+  pinMode(*(lcd.controlPins + RST), LOW); // RST..start
   for (i = 0; i < 6; i++) {
     asm("nop");
   }
-  pinMode(*(lcd.controlPins + 4), HIGH); // RST..end
-  pinMode(*(lcd.controlPins + 2), LOW); // CE
-  pinMode(*(lcd.controlPins + 3), HIGH); // CD
-  pinMode(*(lcd.controlPins), LOW); // WR
-  pinMode(*(lcd.controlPins + 1), HIGH); // RD
-  pinMode(*(lcd.controlPins + 5), (fontSize == 6 ? HIGH : LOW)); // FS
+  pinMode(*(lcd.controlPins + RST), HIGH); // RST..end
+  /* pinMode(*(lcd.controlPins + CE), LOW); // CE */
+  /* pinMode(*(lcd.controlPins + CD), HIGH); // CD */
+  /* pinMode(*(lcd.controlPins + WR), LOW); // WR */
+  /* pinMode(*(lcd.controlPins + RD), HIGH); // RD */
+  /* pinMode(*(lcd.controlPins + FS), (fontSize == 6 ? HIGH : LOW)); // FS */
   
 
   // set analog outputs (PWM)
@@ -62,7 +59,10 @@ Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD)
 {
   int i;
   // set mode
-  setMode(READ, DATA);
+  setMode(READ, STATUS);
+
+  // wait 150 ns...100MGHz is about 10ns per cycle...1ms is pleeeenty
+  delay(200);
 
   // read state of 8-bit data bus
   Byte byte = 0;
@@ -73,8 +73,22 @@ Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD)
     }
   }
 
+  digitalWrite(*(lcd.controlPins + CE), HIGH);
+
+  /* // trigger reset */
+  pinMode(*(lcd.controlPins + RST), LOW); // RST..start
+  delay(500);
+  for (i = 0; i < 6; i++) {
+    asm("nop");
+  }
+  pinMode(*(lcd.controlPins + RST), HIGH); // RST..end
+  if (digitalRead(*(lcd.dataPins + 0)) == HIGH) {
+    byte |= 1 << 1;
+  }
+  
+
   // return to previous
-  setMode(currentRW, currentCD);
+  /* setMode(currentRW, currentCD); */
 
   return byte;
 }
@@ -98,9 +112,9 @@ void setMode(uint8_t RW, uint8_t CD)
   switch(RW) {
     case READ:
       // set WR high
-      digitalWrite(*(lcd.controlPins + RD), HIGH);
+      digitalWrite(*(lcd.controlPins + WR), HIGH);
       // set RD low
-      digitalWrite(*(lcd.controlPins + WR), LOW);
+      digitalWrite(*(lcd.controlPins + RD), LOW);
       // set data bus as inputs
       for (i = 0; i < 7; i++) {
         pinMode(*(lcd.dataPins + i), INPUT);
@@ -108,24 +122,26 @@ void setMode(uint8_t RW, uint8_t CD)
       break;
     case WRITE:
       // set WR low
-      digitalWrite(*(lcd.controlPins + RD), LOW);
+      digitalWrite(*(lcd.controlPins + WR), LOW);
       // set RD high
-      digitalWrite(*(lcd.controlPins + WR), HIGH);
+      digitalWrite(*(lcd.controlPins + RD), HIGH);
       // set data bus as inputs
       for (i = 0; i < 7; i++) {
         pinMode(*(lcd.dataPins + i), HIGH);
       }
       break;
   }
+  // set CE low
+  digitalWrite(*(lcd.controlPins + CE), LOW);
   // set Command/Data state
   switch(CD) {
     case COMMAND:
       // low = command
-      digitalWrite(*(lcd.controlPins + CD), LOW);
+      digitalWrite(*(lcd.controlPins + CD), HIGH);
       break;
     case DATA:
       // high = data
-      digitalWrite(*(lcd.controlPins + CD), HIGH);
+      digitalWrite(*(lcd.controlPins + CD), LOW);
       break;
   }
 }

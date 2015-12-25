@@ -27,7 +27,6 @@ extern "C" {
 // Pre-proc. Dirs.
 #define NUM_LEDS 5
 #define NUM_BUTTONS 2
-#define NUM_LCD_DATA_PINS 8
 #define LCD_BACKLIGHT_VIN_PIN 22
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
@@ -49,7 +48,7 @@ enum Leds {
   BLUE,
   YELLOW,
   RED,
-  STATUS,
+  STATUS_LED,
   SPEED
 };
 enum Buttons {
@@ -75,8 +74,8 @@ typedef struct Vehicle { // the main attributes of the vehicle
 Vehicle vehicle = {};
 const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
 const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
-uint8_t controlPins[NUM_LCD_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
-uint8_t dataPins[6] = {0, 1, 2, 3, 4, 5}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+uint8_t dataPins[NUM_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+uint8_t controlPins[NUM_CNTRL_PINS] = {0, 1, 2, 3, 4, 5}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
 const uint8_t lcdLighting[13] = {20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 150};
 
 // U8GLIB_T6963_240X64(d0, d1, d2, d3, d4, d5, d6, d7, cs, a0, wr, rd [, reset]);
@@ -107,22 +106,10 @@ void setup() {
     vehicle.leds[i] = OFF;
   }
   // show setup complete
-  vehicle.leds[STATUS] = ON;
+  vehicle.leds[STATUS_LED] = ON;
 
-
-
-
-
-
-  // LCD STUFF
-  /* // init lcdPower */
-  /* pinMode(LCD_BACKLIGHT_VIN_PIN, OUTPUT); */
-  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 200); */
-  /* delay(1000); */
-  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 0); */
-  /*  */
-  /* // init */
-  /* LCD.Initialize(); */
+  // New LCD Stuff
+  LcdInit(240, 64, 6, 200, controlPins, dataPins, 22);
 
 
 }
@@ -130,31 +117,36 @@ void setup() {
 int up = 1;
 int glb = 0;
 int length = 200;
-int ran = 0;
+int setupIncomplete = 1;
+uint8_t statusByte = 0;
+uint8_t tmp = 0;
 // Main control run loop
 void loop() {
   int i;
 
 
+  /* uint8_t some = 131; */
+  /* Serial.print("Test: "); */
+  /* Serial.println(some, BIN); */
   // wait for lcd to heat up
-  uint8_t statusByte = 0;
-  while (!(statusByte & STATUS_READY)) {
-    // New LCD Stuff
-    LcdInit(240, 64, 6, 150, controlPins, dataPins, 22);
-    /* WriteChar((char)128); */
-    statusByte = GetStatusByte(WRITE, DATA);
-    Serial.print("Status: ");
-    Serial.println(statusByte, BIN);
-    Serial.print("  ->");
-    Serial.println((statusByte & STATUS_READY), BIN);
-    delay(1000);
-  }
-  if (!ran) {
-    Serial.println("Status: Ready");
-    ran = 1;
+  if (setupIncomplete) {
+    if (!(statusByte & STATUS_READY)) {
+      statusByte = GetStatusByte(WRITE, DATA);
+      Serial.print("Status: ");
+      for (i = NUM_DATA_PINS; i >= 0; i--) {
+        tmp = statusByte << (7-i);
+        tmp = tmp >> 7;
+        Serial.print(tmp);
+      }
+      Serial.println(".");
+      delay(1000);
+    } else {
+      Serial.println("Status: Ready");
+      setupIncomplete = 0;
+    }
   }
 
-  Serial.println("Cycle");
+  /* Serial.println("Cycle"); */
   if (glb == length) {
     up = 0;
   } else if (glb == 0) {

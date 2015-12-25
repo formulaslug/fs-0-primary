@@ -17,7 +17,9 @@ typedef struct LCD {
 } LCD;
 
 // Pre-proc.
-#define STATUS_READY 0x3
+#define STATUS_READY 0x3 // bin 1100 0000
+#define NUM_DATA_PINS 8
+#define NUM_CNTRL_PINS 6
 enum CNTRL_PINS {
   WR,
   RD,
@@ -40,7 +42,8 @@ enum DATA_PINS {
 enum MODES {
   READ,
   WRITE,
-  COMMAND,
+  COMMAND = 2,
+  STATUS = 2, // same value but diff name just to distinguish actual function
   DATA
 };
 
