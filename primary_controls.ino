@@ -13,13 +13,16 @@
 #include <stdio.h>
 // LCD - T6963
 /* #include <U8glib.h> */
-#include "T6963.h"
-#include "gfxdata.h"
-#include "Times_New_Roman__14.h"
+/* #include "T6963.h" */
+/* #include "gfxdata.h" */
+/* #include "Times_New_Roman__14.h" */
 
-T6963 LCD(240,64,6,32);// 240x64 Pixel and 6x8 Font
+/* T6963 LCD(240,64,6,32);// 240x64 Pixel and 6x8 Font */
 
 // User libraries
+extern "C" {
+  #include "FS_T6963C_Lib.h"
+}
 
 // Pre-proc. Dirs.
 #define NUM_LEDS 5
@@ -72,7 +75,8 @@ typedef struct Vehicle { // the main attributes of the vehicle
 Vehicle vehicle = {};
 const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
 const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
-const uint8_t teensy2LcdPins[NUM_LCD_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+uint8_t controlPins[NUM_LCD_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
+uint8_t dataPins[6] = {0, 1, 2, 3, 4, 5}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
 const uint8_t lcdLighting[13] = {20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 150};
 
 // U8GLIB_T6963_240X64(d0, d1, d2, d3, d4, d5, d6, d7, cs, a0, wr, rd [, reset]);
@@ -107,15 +111,22 @@ void setup() {
 
 
 
+  // New LCD Stuff
+  LcdInit(240, 64, 6, 150, controlPins, dataPins, 22);
+  WriteChar((char)128);
+
+
+
+
   // LCD STUFF
-  // init lcdPower
-  pinMode(LCD_BACKLIGHT_VIN_PIN, OUTPUT);
-  analogWrite(LCD_BACKLIGHT_VIN_PIN, 200);
-  delay(1000);
-  analogWrite(LCD_BACKLIGHT_VIN_PIN, 0);
-  
-  // init
-  LCD.Initialize();
+  /* // init lcdPower */
+  /* pinMode(LCD_BACKLIGHT_VIN_PIN, OUTPUT); */
+  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 200); */
+  /* delay(1000); */
+  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 0); */
+  /*  */
+  /* // init */
+  /* LCD.Initialize(); */
 
 
 }
@@ -126,12 +137,14 @@ int length = 200;
 // Main control run loop
 void loop() {
   int i;
+
+  Serial.println("Cycle");
   if (glb == length) {
     up = 0;
   } else if (glb == 0) {
     up = true;
   }
-  analogWrite(LCD_BACKLIGHT_VIN_PIN, 50+glb);
+  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 50+glb); */
 
   if (up) {
     glb += 2;
