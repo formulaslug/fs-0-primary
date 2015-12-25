@@ -7,6 +7,9 @@
 
 LCD lcd = {};
 
+// Private function declarations
+void setMode(uint8_t RW, uint8_t CD);
+
 // function defintions
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin)
 {
@@ -49,16 +52,31 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   analogWrite(lcd.backlightPin, lcd.brightness);
 
   /*DATA*/
-  int i;
   for (i = 0; i < 7; i++) {
     pinMode(*(lcd.dataPins + i), HIGH);
   }
   return 1;
 }
 
-byte GetStatusByte()
+Byte GetStatusByte(uint8_t currentRW, uint8_t currentCD)
 {
-  pinMode(*(lcd.controlPins), INPUT);
+  int i;
+  // set mode
+  setMode(READ, DATA);
+
+  // read state of 8-bit data bus
+  Byte byte = 0;
+  for (i = 0; i < 7; i++) {
+    // if high, set the corresponding bit
+    if (digitalRead(*(lcd.dataPins + i)) == HIGH) {
+      byte |= 1 << i;
+    }
+  }
+
+  // return to previous
+  setMode(currentRW, currentCD);
+
+  return byte;
 }
 
 void WriteChar(char c)
@@ -73,3 +91,41 @@ void WriteChar(char c)
 }
 
 /*PRIVATE FUNCTIONS*/
+void setMode(uint8_t RW, uint8_t CD)
+{
+  int i;
+  // set Read/Write state
+  switch(RW) {
+    case READ:
+      // set WR high
+      digitalWrite(*(lcd.controlPins + RD), HIGH);
+      // set RD low
+      digitalWrite(*(lcd.controlPins + WR), LOW);
+      // set data bus as inputs
+      for (i = 0; i < 7; i++) {
+        pinMode(*(lcd.dataPins + i), INPUT);
+      }
+      break;
+    case WRITE:
+      // set WR low
+      digitalWrite(*(lcd.controlPins + RD), LOW);
+      // set RD high
+      digitalWrite(*(lcd.controlPins + WR), HIGH);
+      // set data bus as inputs
+      for (i = 0; i < 7; i++) {
+        pinMode(*(lcd.dataPins + i), HIGH);
+      }
+      break;
+  }
+  // set Command/Data state
+  switch(CD) {
+    case COMMAND:
+      // low = command
+      digitalWrite(*(lcd.controlPins + CD), LOW);
+      break;
+    case DATA:
+      // high = data
+      digitalWrite(*(lcd.controlPins + CD), HIGH);
+      break;
+  }
+}

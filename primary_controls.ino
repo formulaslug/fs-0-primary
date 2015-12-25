@@ -111,10 +111,6 @@ void setup() {
 
 
 
-  // New LCD Stuff
-  LcdInit(240, 64, 6, 150, controlPins, dataPins, 22);
-  WriteChar((char)128);
-
 
 
 
@@ -134,9 +130,29 @@ void setup() {
 int up = 1;
 int glb = 0;
 int length = 200;
+int ran = 0;
 // Main control run loop
 void loop() {
   int i;
+
+
+  // wait for lcd to heat up
+  uint8_t statusByte = 0;
+  while (!(statusByte & STATUS_READY)) {
+    // New LCD Stuff
+    LcdInit(240, 64, 6, 150, controlPins, dataPins, 22);
+    /* WriteChar((char)128); */
+    statusByte = GetStatusByte(WRITE, DATA);
+    Serial.print("Status: ");
+    Serial.println(statusByte, BIN);
+    Serial.print("  ->");
+    Serial.println((statusByte & STATUS_READY), BIN);
+    delay(1000);
+  }
+  if (!ran) {
+    Serial.println("Status: Ready");
+    ran = 1;
+  }
 
   Serial.println("Cycle");
   if (glb == length) {
@@ -244,7 +260,7 @@ void loop() {
   }
 
   // add some delay for temporary visual effects
-  delay(vehicle.dynamics.torque); // vehicle.ledTime
+  /* delay(vehicle.dynamics.torque); // vehicle.ledTime */
   // an incrementor for num cycles awareness in FSM
   (vehicle.i)++;
 }
