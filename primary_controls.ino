@@ -109,7 +109,6 @@ void setup() {
   vehicle.leds[STATUS_LED] = ON;
 
 
-
 }
 
 int up = 1;
@@ -118,16 +117,20 @@ int length = 200;
 int setupIncomplete = 1;
 uint8_t statusByte = 0;
 uint8_t tmp = 0;
+int i = 0, k = 0;
+int cycles = 0, rs = 0, nrs = 0;
 // Main control run loop
 void loop() {
-  int i;
 
   // wait for lcd to heat up
   if (setupIncomplete) {
-    // New LCD Stuff
-    LcdInit(240, 64, 6, BCK_LOW, controlPins, dataPins, 22);
-    Serial.println("Status: Ready");
-    setupIncomplete = 0;
+    // Init LCD
+    if (!LcdInit(240, 64, 6, BCK_LOW, controlPins, dataPins, 22)) {
+      Serial.println("Error: LCD Failed to Initialize");
+    } else {
+      Serial.println("Status: Ready");
+      setupIncomplete = 0;
+    }
     /* if (!(statusByte & STATUS_READY)) { */
     /*   statusByte = LCDGetStatusByte(WRITE, DATA); */
     /*   Serial.print("Status: "); */
@@ -144,28 +147,36 @@ void loop() {
     /*   LCDSetBrightness(250); */
     /* } */
   }
+
   statusByte = LCDGetStatusByte();
-  Serial.print("Status: ");
-  for (i = NUM_DATA_PINS; i >= 0; i--) {
-    tmp = statusByte << (7-i);
-    tmp = tmp >> 7;
-    Serial.print(tmp);
-  }
-  Serial.println(".");
-
-  /* Serial.println("Cycle"); */
-  if (glb == length) {
-    up = 0;
-  } else if (glb == 0) {
-    up = true;
-  }
-  /* analogWrite(LCD_BACKLIGHT_VIN_PIN, 50+glb); */
-
-  if (up) {
-    glb += 2;
+  if ((statusByte & STATUS_READY)) {
+    // ready
+    rs++;
   } else {
-    glb -= 2;
+    // not ready
+    nrs++;
   }
+
+  if (k%500 == 0) {
+    Serial.print("Status: Readys=");
+    Serial.print(rs);
+    Serial.print(", Not-Readys=");
+    Serial.print(nrs);
+    Serial.print(", Cycles=");
+    Serial.print(cycles);
+    Serial.println(".");
+    k = 0;
+  }
+  k++;
+  cycles++;
+
+  /* Serial.print("Status: "); */
+  /* for (i = NUM_DATA_PINS-1; i >= 0; i--) { */
+  /*   tmp = statusByte << (7-i); */
+  /*   tmp = tmp >> 7; */
+  /*   Serial.print(tmp); */
+  /* } */
+  /* Serial.println("."); */
 
   // Vehicle's main state machine (FSM)
   switch (vehicle.state) {
@@ -186,14 +197,14 @@ void loop() {
       }
       break;
     case HV_SD:
-      delay(250);
+      /* delay(250); */
       // perform HV_SD functions
         // HERE
       // transition to LV_ACTIVE
       vehicle.state = LV_ACTIVE;
       break;
     case HV_STARTUP:
-      delay(250);
+      /* delay(250); */
       // perform LV_STARTUP functions
         // HERE
       // transition to LV_ACTIVE
@@ -213,14 +224,14 @@ void loop() {
       }
       break;
     case RTD_SD:
-      delay(250);
+      /* delay(250); */
       // perform HV_SD functions
         // HERE
       // transition to LV_ACTIVE
       vehicle.state = HV_ACTIVE;
       break;
     case RTD_STARTUP:
-      delay(250);
+      /* delay(250); */
       // perform LV_STARTUP functions
         // HERE
       // transition to LV_ACTIVE

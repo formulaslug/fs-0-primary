@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 // Data types
-typedef uint8_t Byte;
 typedef struct LCD {
   uint16_t width;
   uint16_t height;
@@ -63,8 +62,9 @@ enum MODES {
  */
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin);
 void LCDWriteChar(char c);
-Byte LCDGetStatusByte();
+uint8_t LCDGetStatusByte();
 void LCDSetBrightness(uint8_t value, uint8_t delayTime);
+uint8_t LCDWaitUntilReady();
 
 
 #endif
