@@ -20,6 +20,15 @@ typedef struct LCD {
 #define STATUS_READY 0x3 // bin 1100 0000
 #define NUM_DATA_PINS 8
 #define NUM_CNTRL_PINS 6
+#define ON 1
+#define OFF 0
+enum BRIGHTNESS_STATES {
+  BCK_OFF = 0,
+  BCK_LOW = 25,
+  BCK_MEDIUM = 100,
+  BCK_HIGH = 200,
+  BCK_FULL = 255
+};
 enum CNTRL_PINS {
   WR,
   RD,
@@ -54,8 +63,8 @@ enum MODES {
  */
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin);
 void LCDWriteChar(char c);
-Byte LCDGetStatusByte(uint8_t currentRW, uint8_t currentCD);
-void LCDSetBrightness(uint8_t value);
+Byte LCDGetStatusByte();
+void LCDSetBrightness(uint8_t value, uint8_t delayTime);
 
 
 #endif

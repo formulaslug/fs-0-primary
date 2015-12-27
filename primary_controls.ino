@@ -31,8 +31,8 @@ extern "C" {
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
 #define false 0x00
-#define ON 0xff
-#define OFF 0x0
+#define LED_ON 0xff
+#define LED_OFF 0x0
 #define TORQUE_INPUT A9
 enum States {
   LV_STARTUP,
@@ -103,13 +103,11 @@ void setup() {
   vehicle.i = 0;
   vehicle.dynamics.torque = 10;
   for (i = 0; i < NUM_LEDS; i++) {
-    vehicle.leds[i] = OFF;
+    vehicle.leds[i] = LED_OFF;
   }
   // show setup complete
   vehicle.leds[STATUS_LED] = ON;
 
-  // New LCD Stuff
-  LcdInit(240, 64, 6, 75, controlPins, dataPins, 22);
 
 
 }
@@ -124,28 +122,36 @@ uint8_t tmp = 0;
 void loop() {
   int i;
 
-
-  /* uint8_t some = 131; */
-  /* Serial.print("Test: "); */
-  /* Serial.println(some, BIN); */
   // wait for lcd to heat up
   if (setupIncomplete) {
-    if (!(statusByte & STATUS_READY)) {
-      statusByte = LCDGetStatusByte(WRITE, DATA);
-      Serial.print("Status: ");
-      for (i = NUM_DATA_PINS; i >= 0; i--) {
-        tmp = statusByte << (7-i);
-        tmp = tmp >> 7;
-        Serial.print(tmp);
-      }
-      Serial.println(".");
-    } else {
-      Serial.println("Status: Ready");
-      setupIncomplete = 0;
-      // inc brightness to operational level
-      LCDSetBrightness(250);
-    }
+    // New LCD Stuff
+    LcdInit(240, 64, 6, BCK_LOW, controlPins, dataPins, 22);
+    Serial.println("Status: Ready");
+    setupIncomplete = 0;
+    /* if (!(statusByte & STATUS_READY)) { */
+    /*   statusByte = LCDGetStatusByte(WRITE, DATA); */
+    /*   Serial.print("Status: "); */
+    /*   for (i = NUM_DATA_PINS; i >= 0; i--) { */
+    /*     tmp = statusByte << (7-i); */
+    /*     tmp = tmp >> 7; */
+    /*     Serial.print(tmp); */
+    /*   } */
+    /*   Serial.println("."); */
+    /* } else { */
+    /*   Serial.println("Status: Ready"); */
+    /*   setupIncomplete = 0; */
+    /*   // inc brightness to operational level */
+    /*   LCDSetBrightness(250); */
+    /* } */
   }
+  statusByte = LCDGetStatusByte();
+  Serial.print("Status: ");
+  for (i = NUM_DATA_PINS; i >= 0; i--) {
+    tmp = statusByte << (7-i);
+    tmp = tmp >> 7;
+    Serial.print(tmp);
+  }
+  Serial.println(".");
 
   /* Serial.println("Cycle"); */
   if (glb == length) {
@@ -171,9 +177,9 @@ void loop() {
       break;
     case LV_ACTIVE:
       // set led feedback
-      vehicle.leds[BLUE] = ON;
-      vehicle.leds[YELLOW] = OFF;
-      vehicle.leds[RED] = OFF;
+      vehicle.leds[BLUE] = LED_ON;
+      vehicle.leds[YELLOW] = LED_OFF;
+      vehicle.leds[RED] = LED_OFF;
       // wait to move to HV_STARTUP
       if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
         vehicle.state = HV_STARTUP;
@@ -195,9 +201,9 @@ void loop() {
       break;
     case HV_ACTIVE:
       // set led feedback
-      vehicle.leds[BLUE] = ON;
-      vehicle.leds[YELLOW] = ON;
-      vehicle.leds[RED] = OFF;
+      vehicle.leds[BLUE] = LED_ON;
+      vehicle.leds[YELLOW] = LED_ON;
+      vehicle.leds[RED] = LED_OFF;
       // wait to move to RTD_STARTUP until user input
       if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
         vehicle.state = RTD_STARTUP;
@@ -224,9 +230,9 @@ void loop() {
     case RTD_ACTIVE:
       // show entire system is hot
       if (vehicle.i <= 1) {
-        vehicle.leds[BLUE] = ON;
-        vehicle.leds[YELLOW] = ON;
-        vehicle.leds[RED] = ON;
+        vehicle.leds[BLUE] = LED_ON;
+        vehicle.leds[YELLOW] = LED_ON;
+        vehicle.leds[RED] = LED_ON;
       } else {
         // get speed
         vehicle.dynamics.torque = (int)(analogRead(TORQUE_INPUT) / 2);
@@ -235,7 +241,7 @@ void loop() {
         // wait to transition back
         if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
           // move back to HV_ACTIVE
-          vehicle.leds[SPEED] = OFF;
+          vehicle.leds[SPEED] = LED_OFF;
           vehicle.dynamics.torque = 50;
           vehicle.state = RTD_SD;
         }
