@@ -1,51 +1,52 @@
 /*
- * @authors Milo Webster, 
  * @desc Pimary control system for the UCSC's Formula Slug Electric FSAE Vehicle
  * @dict LV = Low Voltage System, HV = High Voltage System, RTD = Ready-To-Drive
  */
 
-
 // Rev notes: Need some button debounce
 
+#include <cstdint>
+#include <cstdio>
 
-// System libraries
-#include <stdint.h>
-#include <stdio.h>
 // LCD - T6963
-/* #include <U8glib.h> */
-/* #include "T6963.h" */
-/* #include "gfxdata.h" */
-/* #include "Times_New_Roman__14.h" */
+// #include <U8glib.h>
+// #include "T6963.h"
+// #include "gfxdata.h"
+// #include "Times_New_Roman__14.h"
 
-/* T6963 LCD(240,64,6,32);// 240x64 Pixel and 6x8 Font */
+// T6963 LCD(240, 64, 6, 32); // 240x64 Pixel and 6x8 Font
 
-// User libraries
 extern "C" {
   #include "FS_T6963C_Lib.h"
 }
 
-// Pre-proc. Dirs.
-#define NUM_LEDS 5
-#define NUM_BUTTONS 2
-#define LCD_BACKLIGHT_VIN_PIN 22
-// operating on all 8 bits so that can be notted "~"
-#define true 0xff
-#define false 0x00
-#define ON 1
-#define OFF 0
-#define LED_ON 0xff
-#define LED_OFF 0x0
-#define TORQUE_INPUT A9
+#include <array>
+#include <cstdint>
+
+constexpr uint8_t NUM_LEDS = 5;
+constexpr uint8_t NUM_BUTTONS = 2;
+constexpr uint8_t LCD_BACKLIGHT_VIN_PIN = 22;
+constexpr uint8_t ON = 1;
+constexpr uint8_t OFF = 0;
+
+// Operating on all 8 bits so that can be notted "~"
+constexpr uint8_t LED_ON = 0xff;
+constexpr uint8_t LED_OFF = 0x00;
+constexpr uint8_t TORQUE_INPUT = A9;
+
 enum States {
   LV_STARTUP,
   LV_ACTIVE,
-  HV_SD,
+
   HV_STARTUP,
   HV_ACTIVE,
-  RTD_SD,
+  HV_SHUTDOWN,
+
   RTD_STARTUP,
   RTD_ACTIVE,
+  RTD_SHUTDOWN,
 };
+
 enum Leds {
   BLUE,
   YELLOW,
@@ -53,243 +54,241 @@ enum Leds {
   STATUS_LED,
   SPEED
 };
+
 enum Buttons {
   HV_TOGGLE,
   RTD_TOGGLE
 };
 
-// Data types
-typedef struct Dynamics {
+struct Dynamics {
   uint16_t torque;
   uint16_t speed;
   uint8_t topSpeed = 60;
-} Dynamics;
-
-typedef struct Vehicle { // the main attributes of the vehicle
-  uint8_t state;
-  uint8_t leds[NUM_LEDS]; // led values are 0x0 or 0xff to allow for bit-wise not
-  Dynamics dynamics;
-  int i;
-} Vehicle;
-
-// Globals
-Vehicle vehicle = {};
-const uint8_t ledPins[NUM_LEDS] = {2, 3, 4, 13, 5};
-const uint8_t buttonPins[NUM_BUTTONS] = {7, 8};
-uint8_t dataPins[NUM_DATA_PINS] = {14, 18, 15, 19, 16, 20, 17, 21}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
-uint8_t controlPins[NUM_CNTRL_PINS] = {0, 1, 2, 3, 4, 5}; // order of array is order of corresponding 8 pins 11-18 on the lcd, use this to lookup needed pin on teensy
-const uint8_t lcdLighting[13] = {20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 140, 150};
+};
 
 // U8GLIB_T6963_240X64(d0, d1, d2, d3, d4, d5, d6, d7, cs, a0, wr, rd [, reset]);
-/* U8GLIB_T6963_240X64(teensy2LcdPins[0], teensy2LcdPins[1], teensy2LcdPins[2], teensy2LcdPins[3], teensy2LcdPins[4], teensy2LcdPins[5], teensy2LcdPins[6], teensy2LcdPins[7], 6, 9, 10, 11, 12); */
+/* U8GLIB_T6963_240X64(teensy2LcdPins[0], teensy2LcdPins[1], teensy2LcdPins[2],
+ *                     teensy2LcdPins[3], teensy2LcdPins[4], teensy2LcdPins[5],
+ *                     teensy2LcdPins[6], teensy2LcdPins[7], 6, 9, 10, 11, 12);
+ */
 
+class Vehicle {
+ public:
+  Vehicle() {
+    for (auto& led : ledStates) {
+      led = LED_OFF;
+    }
+    ledStates[STATUS_LED] = ON;
+  }
 
-// Main setup function
+  uint8_t state = LV_STARTUP;
+
+  Dynamics dynamics;
+
+  // LED values are 0x00 or 0xff to allow for bitwise not
+  std::array<uint8_t, NUM_LEDS> ledStates;
+
+  int numCycles = 0;
+};
+
+// Globals
+Vehicle gVehicle;
+const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 13, 5};
+const std::array<uint8_t, NUM_BUTTONS> gButtonPins{7, 8};
+
+/* Order of array is order of corresponding 8 pins 11-18 on the LCD.
+ * Use this to look up needed pin on Teensy
+ */
+std::array<uint8_t, NUM_DATA_PINS> gDataPins{14, 18, 15, 19, 16, 20, 17, 21};
+std::array<uint8_t, NUM_CNTRL_PINS> gControlPins{0, 1, 2, 3, 4, 5};
+
+std::array<uint8_t, 13> gLcdLighting{20, 30, 40, 50, 60, 70, 80, 90, 100, 110,
+                                     120, 140, 150};
+
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(9600);
   Serial.println("Setup Complete.");
 
-  // init leds pins
-  int i;
-  for (i = 0; i < NUM_LEDS; i++) {
-    pinMode(ledPins[i], HIGH);
+  // Init LEDs
+  for (auto& ledPin : gLedPins) {
+    pinMode(ledPin, HIGH);
   }
-  // init buttons pins
-  for (i = 0; i < NUM_BUTTONS; i++) {
-    pinMode(buttonPins[i], INPUT);
+  // Init buttons
+  for (auto& buttonPin : gButtonPins) {
+    pinMode(buttonPin, INPUT);
   }
 
-  // init the vehicle
-  vehicle.state = LV_STARTUP;
-  vehicle.i = 0;
-  vehicle.dynamics.torque = 10;
-  for (i = 0; i < NUM_LEDS; i++) {
-    vehicle.leds[i] = LED_OFF;
-  }
-  // show setup complete
-  vehicle.leds[STATUS_LED] = ON;
-
-
+  // Init vehicle
+  gVehicle.dynamics.torque = 10;
 }
 
-int up = 1;
-int glb = 0;
-int length = 200;
-int setupIncomplete = 1;
-uint8_t statusByte = 0;
-uint8_t tmp = 0;
-int i = 0, k = 0;
-int cycles = 0, rs = 0, nrs = 0;
+// Used for LCD
+bool setupIncomplete = true;
+uint8_t lcdStatus = 0;
+
+// Used for debugging LCD
+int printCounter = 0;
+int cycles = 0, readies = 0, notReadies = 0;
+
 // Main control run loop
 void loop() {
+  /* Left off trying to finish lcd initialization by setting the graphics home
+   * address detailed in the first pdf and then expanded on in the others
+   */
 
-
-
-/*
-Left off trying to finish lcd initialization by setting the graphics home address detailed in the first pdf and then expanded on in the others
-*/
-
-
-
-  // wait for lcd to heat up
+  // Init LCD
   if (setupIncomplete) {
-    // Init LCD
+    // Wait for lcd to heat up
     delay(1000);
-    if (!LcdInit(240, 64, 8, BCK_FULL, controlPins, dataPins, LCD_BACKLIGHT_VIN_PIN)) {
+    if (!LcdInit(240, 64, 8, BCK_FULL, &gControlPins[0], &gDataPins[0],
+                 LCD_BACKLIGHT_VIN_PIN)) {
       Serial.println("Error: LCD Failed to Initialize");
     } else {
       Serial.println("Status: Ready");
-      setupIncomplete = 0;
+      setupIncomplete = false;
     }
-    /* if (!(statusByte & STATUS_READY)) { */
-    /*   statusByte = LCDGetStatusByte(WRITE, DATA); */
-    /*   Serial.print("Status: "); */
-    /*   for (i = NUM_DATA_PINS; i >= 0; i--) { */
-    /*     tmp = statusByte << (7-i); */
-    /*     tmp = tmp >> 7; */
-    /*     Serial.print(tmp); */
-    /*   } */
-    /*   Serial.println("."); */
-    /* } else { */
-    /*   Serial.println("Status: Ready"); */
-    /*   setupIncomplete = 0; */
-    /*   // inc brightness to operational level */
-    /*   LCDSetBrightness(250); */
-    /* } */
+
+    /* if (lcdStatus & STATUS_READY) {
+     *   Serial.println("Status: Ready");
+     *   setupIncomplete = false;
+     *
+     *   // Increase brightness to operational level
+     *   LCDSetBrightness(250);
+     * }
+     * else {
+     *   lcdStatus = LCDGetStatusByte(WRITE, DATA);
+     *   Serial.print("Status: ");
+     *   for (int i = 0; i < NUM_DATA_PINS; i++) {
+     *     Serial.print((lcdStatus & (1 << i)) >> i);
+     *   }
+     *   Serial.println(".");
+     * }
+     */
   } else {
+    /* int brightness = LCDSetBrightness(200, 1000);
+     * Serial.print("Time between is :");
+     * Serial.println(brightness);
+     */
+    lcdStatus = LCDGetStatusByte();
 
-    /* int bt = LCDSetBrightness(200, 1000); */
-    /* Serial.print("Time between is :"); */
-    /* Serial.println(bt); */
-    statusByte = LCDGetStatusByte();
-    if ((statusByte & STATUS_READY)) {
-      // ready
-      rs++;
+    // If LCD is ready
+    if (lcdStatus & STATUS_READY) {
+      readies++;
     } else {
-      // not ready
-      nrs++;
+      notReadies++;
     }
 
-    if (k%500 == 0) {
+    if (printCounter % 500 == 0) {
       Serial.print("Status: Readys=");
-      Serial.print(rs);
+      Serial.print(readies);
       Serial.print(", Not-Readys=");
-      Serial.print(nrs);
+      Serial.print(notReadies);
       Serial.print(", Cycles=");
       Serial.print(cycles);
       Serial.println(".");
-      k = 0;
+      printCounter = 0;
     }
 
-    k++;
+    printCounter++;
     cycles++;
   }
 
 
-  /* Serial.print("Status: "); */
-  /* for (i = NUM_DATA_PINS-1; i >= 0; i--) { */
-  /*   tmp = statusByte << (7-i); */
-  /*   tmp = tmp >> 7; */
-  /*   Serial.print(tmp); */
-  /* } */
-  /* Serial.println("."); */
+  /* Serial.print("Status: ");
+   * for (int i = 0; i < NUM_DATA_PINS; i++) {
+   *   Serial.print((lcdStatus & (1 << i)) >> i);
+   * }
+   * Serial.println(".");
+   */
 
   // Vehicle's main state machine (FSM)
-  switch (vehicle.state) {
+  switch (gVehicle.state) {
     case LV_STARTUP:
-      // perform LV_STARTUP functions
-        // HERE
-      // transition to LV_ACTIVE
-      vehicle.state = LV_ACTIVE;
+      // Perform LV_STARTUP functions
+      // HERE
+
+      // Transition to LV_ACTIVE
+      gVehicle.state = LV_ACTIVE;
       break;
     case LV_ACTIVE:
-      // set led feedback
-      vehicle.leds[BLUE] = LED_ON;
-      vehicle.leds[YELLOW] = LED_OFF;
-      vehicle.leds[RED] = LED_OFF;
-      // wait to move to HV_STARTUP
-      if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
-        vehicle.state = HV_STARTUP;
+      // Set LED feedback
+      gVehicle.ledStates[BLUE] = LED_ON;
+      gVehicle.ledStates[YELLOW] = LED_OFF;
+      gVehicle.ledStates[RED] = LED_OFF;
+
+      // Wait to move to HV_STARTUP
+      if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
+        gVehicle.state = HV_STARTUP;
       }
       break;
-    case HV_SD:
-      /* delay(250); */
-      // perform HV_SD functions
-        // HERE
-      // transition to LV_ACTIVE
-      vehicle.state = LV_ACTIVE;
+    case HV_SHUTDOWN:
+      // Perform HV_SHUTDOWN functions
+      // HERE
+
+      // Transition to LV_ACTIVE
+      gVehicle.state = LV_ACTIVE;
       break;
     case HV_STARTUP:
-      /* delay(250); */
-      // perform LV_STARTUP functions
-        // HERE
-      // transition to LV_ACTIVE
-      vehicle.state = HV_ACTIVE;
+      // Perform LV_STARTUP functions
+      // HERE
+
+      // Transition to LV_ACTIVE
+      gVehicle.state = HV_ACTIVE;
       break;
     case HV_ACTIVE:
-      // set led feedback
-      vehicle.leds[BLUE] = LED_ON;
-      vehicle.leds[YELLOW] = LED_ON;
-      vehicle.leds[RED] = LED_OFF;
-      // wait to move to RTD_STARTUP until user input
-      if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
-        vehicle.state = RTD_STARTUP;
-      } else if (digitalRead(buttonPins[HV_TOGGLE]) == LOW) {
+      // Set LED feedback
+      gVehicle.ledStates[BLUE] = LED_ON;
+      gVehicle.ledStates[YELLOW] = LED_ON;
+      gVehicle.ledStates[RED] = LED_OFF;
+
+      // Wait to move to RTD_STARTUP until user input
+      if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+        gVehicle.state = RTD_STARTUP;
+      } else if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
         // Or move back to LV active
-        vehicle.state = HV_SD;
+        gVehicle.state = HV_SHUTDOWN;
       }
       break;
-    case RTD_SD:
-      /* delay(250); */
-      // perform HV_SD functions
-        // HERE
-      // transition to LV_ACTIVE
-      vehicle.state = HV_ACTIVE;
+    case RTD_SHUTDOWN:
+      // Perform HV_SHUTDOWN functions
+      // HERE
+
+      // Transition to LV_ACTIVE
+      gVehicle.state = HV_ACTIVE;
       break;
     case RTD_STARTUP:
-      /* delay(250); */
-      // perform LV_STARTUP functions
-        // HERE
-      // transition to LV_ACTIVE
-      vehicle.i = 0;
-      vehicle.state = RTD_ACTIVE;
+      // Perform LV_STARTUP functions
+      // HERE
+
+      // Transition to LV_ACTIVE
+      gVehicle.numCycles = 0;
+      gVehicle.state = RTD_ACTIVE;
       break;
     case RTD_ACTIVE:
-      // show entire system is hot
-      if (vehicle.i <= 1) {
-        vehicle.leds[BLUE] = LED_ON;
-        vehicle.leds[YELLOW] = LED_ON;
-        vehicle.leds[RED] = LED_ON;
+      // Show entire system is hot
+      if (gVehicle.numCycles <= 1) {
+        gVehicle.ledStates[BLUE] = LED_ON;
+        gVehicle.ledStates[YELLOW] = LED_ON;
+        gVehicle.ledStates[RED] = LED_ON;
       } else {
-        // get speed
-        vehicle.dynamics.torque = (int)(analogRead(TORQUE_INPUT) / 2);
-        // show speed
-        vehicle.leds[SPEED] = ~vehicle.leds[SPEED];
-        // wait to transition back
-        if (digitalRead(buttonPins[RTD_TOGGLE]) == LOW) {
-          // move back to HV_ACTIVE
-          vehicle.leds[SPEED] = LED_OFF;
-          vehicle.dynamics.torque = 50;
-          vehicle.state = RTD_SD;
+        // Get speed
+        gVehicle.dynamics.torque = (int) analogRead(TORQUE_INPUT) / 2;
+
+        // Show speed
+        gVehicle.ledStates[SPEED] = ~gVehicle.ledStates[SPEED];
+
+        // Wait to transition back
+        if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+          // Move back to HV_ACTIVE
+          gVehicle.ledStates[SPEED] = LED_OFF;
+          gVehicle.dynamics.torque = 50;
+          gVehicle.state = RTD_SHUTDOWN;
         }
       }
       break;
   }
 
-  // set leds to their states after FSM processing
-  for (i = 0; i < NUM_LEDS; i++) {
-    if (vehicle.leds[i]) {
-      digitalWrite(ledPins[i], HIGH);
-    } else {
-      digitalWrite(ledPins[i], LOW);
-    }
-  }
-
-  // add some delay for temporary visual effects
-  /* delay(vehicle.dynamics.torque); // vehicle.ledTime */
-  // an incrementor for num cycles awareness in FSM
-  (vehicle.i)++;
+  // An incrementor for num cycles awareness in FSM
+  gVehicle.numCycles++;
 }
-
 
