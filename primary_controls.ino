@@ -31,6 +31,8 @@ extern "C" {
 // operating on all 8 bits so that can be notted "~"
 #define true 0xff
 #define false 0x00
+#define ON 1
+#define OFF 0
 #define LED_ON 0xff
 #define LED_OFF 0x0
 #define TORQUE_INPUT A9
@@ -122,10 +124,18 @@ int cycles = 0, rs = 0, nrs = 0;
 // Main control run loop
 void loop() {
 
+
+
+/*
+Left off trying to finish lcd initialization by setting the graphics home address detailed in the first pdf and then expanded on in the others
+*/
+
+
+
   // wait for lcd to heat up
   if (setupIncomplete) {
     // Init LCD
-    if (!LcdInit(240, 64, 6, BCK_LOW, controlPins, dataPins, 22)) {
+    if (!LcdInit(240, 64, 6, BCK_FULL, controlPins, dataPins, 22)) {
       Serial.println("Error: LCD Failed to Initialize");
     } else {
       Serial.println("Status: Ready");
@@ -167,6 +177,7 @@ void loop() {
     Serial.println(".");
     k = 0;
   }
+
   k++;
   cycles++;
 

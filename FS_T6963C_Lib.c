@@ -9,6 +9,10 @@
 #define SUCCESS 1
 #define FAILURE 0
 #define ARBITRARY_NUM_REQUESTS 1000
+#define ON 1
+#define OFF 0
+#define LARGE 1
+#define SMALL 0
 
 LCD lcd = {};
 
@@ -18,6 +22,7 @@ void setRW(uint8_t value);
 void setCD(uint8_t value);
 void setCE(uint8_t value);
 void triggerRST();
+void setFS(uint8_t value);
 
 // function defintions
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin)
@@ -37,16 +42,17 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   for (i = 0; i < NUM_CNTRL_PINS; i++) {
     pinMode(*(lcd.controlPins + i), HIGH); // WR
   }
-  // init digital outputs
-  // trigger reset
+
+  // set the fontSize default to SMALL (6 pt.)
+  setFS((fontSize == 6 ? SMALL : LARGE));
+
+  // trigger hardware reset
   triggerRST();
 
-  
-
-  // set analog outputs (PWM)
+  // set backlight PWM output
   pinMode(lcd.backlightPin, OUTPUT); // LED_A
-  // init analog outputs
-  analogWrite(lcd.backlightPin, lcd.brightness);
+  /* // init backlight to requested brihtness */
+  /* analogWrite(lcd.backlightPin, lcd.brightness); */
 
   // DATA
   for (i = 0; i < 7; i++) {
@@ -58,25 +64,21 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
     return FAILURE;
   }
 
-  /* uint8_t statusByte = 0, tmp = 0; */
-  /* // Get status and wait until ready */
-  /* k = 1; */
-  /* while (!(statusByte & STATUS_READY)) { */
-  /*   statusByte = LCDGetStatusByte(WRITE, DATA); */
-  /*   for (i = NUM_DATA_PINS; i >= 0; i--) { */
-  /*     tmp = statusByte << (7-i); */
-  /*     tmp = tmp >> 7; */
-  /*   } */
-  /*   k++; */
-  /* } */
-  // Now ready
+
+  // NOW perform other necessary initializations..like setting the graphics home address
+
+
+
   // Set lines to operational levels
   /* pinMode(*(lcd.controlPins + CD), HIGH); // CD */
   /* pinMode(*(lcd.controlPins + WR), LOW); // WR */
   /* pinMode(*(lcd.controlPins + RD), HIGH); // RD */
   /* pinMode(*(lcd.controlPins + FS), (fontSize == 6 ? HIGH : LOW)); // FS */
-  // inc brightness to operational level
-  LCDSetBrightness(BCK_FULL, 5);
+
+  // inc brightness to requested level to show init complete
+  LCDSetBrightness(lcd.brightness, 5);
+
+  // flash backlight
   /* for (; k > 0; k--) { */
   /*   LCDSetBrightness(BCK_OFF, 0); */
   /*   delay(250); */
@@ -153,19 +155,24 @@ void LCDSetBrightness(uint8_t value, uint8_t delayTime)
   if (value == lcd.brightness) {
     return;
   }
-  // change brightness level by inc/dec.s of 1
-  if (value > lcd.brightness) {
-    for (i = (lcd.brightness + 1); i <= value; i++) {
-      analogWrite(lcd.backlightPin, i);
-      delay(delayTime);
-    }
+  // just jump to brightness if delay is 0ms
+  if (delayTime == 0) {
+    analogWrite(lcd.backlightPin, value);
   } else {
-    for (i = (lcd.brightness - 1); i >= value; i--) {
-      analogWrite(lcd.backlightPin, i);
-      delay(delayTime);
+    // change brightness level by inc/dec.s of 1
+    if (value > lcd.brightness) {
+      for (i = (lcd.brightness + 1); i <= value; i++) {
+        analogWrite(lcd.backlightPin, i);
+        delay(delayTime);
+      }
+    } else {
+      for (i = (lcd.brightness - 1); i >= value; i--) {
+        analogWrite(lcd.backlightPin, i);
+        delay(delayTime);
+      }
     }
   }
-  // set new value
+  // set new value on lcd struct
   lcd.brightness = value;
 }
 
@@ -238,4 +245,17 @@ void triggerRST()
   }
   // lean off
   pinMode(*(lcd.controlPins + RST), HIGH); // RST..end
+}
+void setFS(uint8_t value)
+{
+  switch (value) {
+    // 6 pt.
+    case SMALL:
+      digitalWrite(*(lcd.controlPins + FS), HIGH);
+      break;
+    // 8 pt.
+    case LARGE:
+      digitalWrite(*(lcd.controlPins + FS), LOW);
+      break;
+  }
 }

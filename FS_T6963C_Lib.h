@@ -19,8 +19,6 @@ typedef struct LCD {
 #define STATUS_READY 0x3 // bin 1100 0000
 #define NUM_DATA_PINS 8
 #define NUM_CNTRL_PINS 6
-#define ON 1
-#define OFF 0
 enum BRIGHTNESS_STATES {
   BCK_OFF = 0,
   BCK_LOW = 25,
