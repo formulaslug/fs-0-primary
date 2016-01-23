@@ -135,7 +135,8 @@ Left off trying to finish lcd initialization by setting the graphics home addres
   // wait for lcd to heat up
   if (setupIncomplete) {
     // Init LCD
-    if (!LcdInit(240, 64, 6, BCK_FULL, controlPins, dataPins, 22)) {
+    delay(1000);
+    if (!LcdInit(240, 64, 6, BCK_FULL, controlPins, dataPins, LCD_BACKLIGHT_VIN_PIN)) {
       Serial.println("Error: LCD Failed to Initialize");
     } else {
       Serial.println("Status: Ready");
@@ -156,30 +157,35 @@ Left off trying to finish lcd initialization by setting the graphics home addres
     /*   // inc brightness to operational level */
     /*   LCDSetBrightness(250); */
     /* } */
-  }
-
-  statusByte = LCDGetStatusByte();
-  if ((statusByte & STATUS_READY)) {
-    // ready
-    rs++;
   } else {
-    // not ready
-    nrs++;
+
+    /* int bt = LCDSetBrightness(200, 1000); */
+    /* Serial.print("Time between is :"); */
+    /* Serial.println(bt); */
+    statusByte = LCDGetStatusByte();
+    if ((statusByte & STATUS_READY)) {
+      // ready
+      rs++;
+    } else {
+      // not ready
+      nrs++;
+    }
+
+    if (k%500 == 0) {
+      Serial.print("Status: Readys=");
+      Serial.print(rs);
+      Serial.print(", Not-Readys=");
+      Serial.print(nrs);
+      Serial.print(", Cycles=");
+      Serial.print(cycles);
+      Serial.println(".");
+      k = 0;
+    }
+
+    k++;
+    cycles++;
   }
 
-  if (k%500 == 0) {
-    Serial.print("Status: Readys=");
-    Serial.print(rs);
-    Serial.print(", Not-Readys=");
-    Serial.print(nrs);
-    Serial.print(", Cycles=");
-    Serial.print(cycles);
-    Serial.println(".");
-    k = 0;
-  }
-
-  k++;
-  cycles++;
 
   /* Serial.print("Status: "); */
   /* for (i = NUM_DATA_PINS-1; i >= 0; i--) { */

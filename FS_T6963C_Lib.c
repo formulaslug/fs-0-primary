@@ -8,7 +8,7 @@
 // Pre-proc.
 #define SUCCESS 1
 #define FAILURE 0
-#define ARBITRARY_NUM_REQUESTS 1000
+#define ARBITRARY_NUM_REQUESTS 100000000
 #define ON 1
 #define OFF 0
 #define LARGE 1
@@ -32,7 +32,7 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   lcd.width = lcdWidth;
   lcd.height = lcdHeight;
   lcd.fontSize = fontSize;
-  lcd.brightness = brightness;
+  lcd.brightness = 0; // initialized in LCDSetBrightness()
   lcd.controlPins = controlPins;
   lcd.dataPins = dataPins;
   lcd.backlightPin = backlightPin;
@@ -49,9 +49,9 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   // trigger hardware reset
   triggerRST();
 
-  // set backlight PWM output
+  // set backlight PWM pin output
   pinMode(lcd.backlightPin, OUTPUT); // LED_A
-  /* // init backlight to requested brihtness */
+  // init backlight to requested brihtness
   /* analogWrite(lcd.backlightPin, lcd.brightness); */
 
   // DATA
@@ -76,7 +76,11 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   /* pinMode(*(lcd.controlPins + FS), (fontSize == 6 ? HIGH : LOW)); // FS */
 
   // inc brightness to requested level to show init complete
-  LCDSetBrightness(lcd.brightness, 5);
+  /* LCDSetBrightness(lcd.brightness, 5); */
+  /* LCDSetBrightness(0, 0); */
+  /* LCDSetBrightness(200, 1000); */
+  /* LCDSetBrightness(lcd.brightness, 10); */
+
 
   // flash backlight
   /* for (; k > 0; k--) { */
@@ -84,6 +88,10 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   /*   delay(250); */
   /*   LCDSetBrightness(BCK_FULL, 0); */
   /* } */
+
+
+  // show feedback that lcd has been initialized
+  LCDSetBrightness(brightness, 1000);
 
   return SUCCESS;
 }
@@ -146,34 +154,40 @@ uint8_t LCDGetStatusByte()
 /* } */
 
 /*
- * @param delay: Delay time for each inc/dec in milliseconds
+ * @param delay: total time in milliseconds for the transition
  */
-void LCDSetBrightness(uint8_t value, uint8_t delayTime)
+int LCDSetBrightness(uint8_t value, int delayTime)
 {
   int i;
   // return if no change
   if (value == lcd.brightness) {
-    return;
+    return 0;
   }
   // just jump to brightness if delay is 0ms
   if (delayTime == 0) {
     analogWrite(lcd.backlightPin, value);
   } else {
-    // change brightness level by inc/dec.s of 1
+    // absolute value of the difference from previous value 
+    int valueDiffAbs = value < lcd.brightness ? 
+      -(value - lcd.brightness) : (value - lcd.brightness); 
+    // delay time between each increment
+    int delayTimeEach = delayTime/valueDiffAbs;
+    // change brightness level acording to the delay
     if (value > lcd.brightness) {
       for (i = (lcd.brightness + 1); i <= value; i++) {
         analogWrite(lcd.backlightPin, i);
-        delay(delayTime);
+        delay(delayTimeEach);
       }
     } else {
       for (i = (lcd.brightness - 1); i >= value; i--) {
         analogWrite(lcd.backlightPin, i);
-        delay(delayTime);
+        delay(delayTimeEach);
       }
     }
   }
   // set new value on lcd struct
   lcd.brightness = value;
+  return 1;
 }
 
 

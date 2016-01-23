@@ -61,7 +61,7 @@ enum MODES {
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin);
 void LCDWriteChar(char c);
 uint8_t LCDGetStatusByte();
-void LCDSetBrightness(uint8_t value, uint8_t delayTime);
+int LCDSetBrightness(uint8_t value, int delayTime);
 uint8_t LCDWaitUntilReady();
 
 
