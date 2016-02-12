@@ -1,10 +1,8 @@
 // System libraries
 #include <stdint.h>
 #include "Arduino.h"
-
-// User libraries
+// Private libraries
 #include "FS_T6963C_Lib.h"
-
 // Pre-proc.
 #define SUCCESS 1
 #define FAILURE 0
@@ -13,16 +11,16 @@
 #define OFF 0
 #define LARGE 1
 #define SMALL 0
+#define BYTE 8
 
 LCD lcd = {};
 
-// Private function declarations
-/* void setMode(uint8_t RW, uint8_t CD); */
 void setRW(uint8_t value);
 void setCD(uint8_t value);
 void setCE(uint8_t value);
 void triggerRST();
 void setFS(uint8_t value);
+uint8_t writeByte(char byte);
 
 // function defintions
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin)
@@ -142,21 +140,10 @@ uint8_t LCDGetStatusByte()
   return statusByte;
 }
 
-/* void LCDWriteChar(char c) */
-/* { */
-/*   int i; */
-/*   char bit; */
-/*   for (i = 0; i < 7; i++) { */
-/*     bit = c << (7 - i); */
-/*     bit = c >> 7; */
-/*     digitalWrite(*(lcd.dataPins + i), bit); */
-/*   } */
-/* } */
-
 /*
  * @param delay: total time in milliseconds for the transition
  */
-int LCDSetBrightness(uint8_t value, int delayTime)
+uint8_t LCDSetBrightness(uint8_t value, int delayTime)
 {
   int i;
   // return if no change
@@ -203,22 +190,22 @@ void setRW(uint8_t value)
   switch(value) {
     case READ:
       // set WR high
-      digitalWrite(*(lcd.controlPins + WR), HIGH);
+      digitalWrite(lcd.controlPins[WR], HIGH);
       // set RD low
-      digitalWrite(*(lcd.controlPins + RD), LOW);
+      digitalWrite(lcd.controlPins[RD], LOW);
       // set data bus as inputs
       for (i = 0; i < 7; i++) {
-        pinMode(*(lcd.dataPins + i), INPUT);
+        pinMode(lcd.dataPins[i], INPUT);
       }
       break;
     case WRITE:
       // set WR low
-      digitalWrite(*(lcd.controlPins + WR), LOW);
+      digitalWrite(lcd.controlPins[WR], LOW);
       // set RD high
-      digitalWrite(*(lcd.controlPins + RD), HIGH);
+      digitalWrite(lcd.controlPins[RD], HIGH);
       // set data bus as inputs
       for (i = 0; i < 7; i++) {
-        pinMode(*(lcd.dataPins + i), HIGH);
+        pinMode(lcd.dataPins[i], HIGH);
       }
       break;
   }
@@ -229,11 +216,11 @@ void setCD(uint8_t value)
     // or STATUS
     case COMMAND:
       // low = command
-      digitalWrite(*(lcd.controlPins + CD), HIGH);
+      digitalWrite(lcd.controlPins[CD], HIGH);
       break;
     case DATA:
       // high = data
-      digitalWrite(*(lcd.controlPins + CD), LOW);
+      digitalWrite(lcd.controlPins[CD], LOW);
       break;
   }
 }
@@ -241,10 +228,10 @@ void setCE(uint8_t value)
 {
   switch (value) {
     case ON:
-      digitalWrite(*(lcd.controlPins + CE), LOW);
+      digitalWrite(lcd.controlPins[CE], LOW);
       break;
     case OFF:
-      digitalWrite(*(lcd.controlPins + CE), HIGH);
+      digitalWrite(lcd.controlPins[CE], HIGH);
       break;
   }
 }
@@ -252,24 +239,102 @@ void triggerRST()
 {
   int i;
   // trigger reset
-  pinMode(*(lcd.controlPins + RST), LOW); // RST..start
+  pinMode(lcd.controlPins[RST], LOW); // RST..start
   // hold for 7 cycles
   for (i = 0; i < 6; i++) {
     asm("nop");
   }
   // lean off
-  pinMode(*(lcd.controlPins + RST), HIGH); // RST..end
+  pinMode(lcd.controlPins[RST], HIGH); // RST..end
 }
 void setFS(uint8_t value)
 {
   switch (value) {
     // 6 pt.
     case SMALL:
-      digitalWrite(*(lcd.controlPins + FS), HIGH);
+      digitalWrite(lcd.controlPins[FS], HIGH);
       break;
     // 8 pt.
     case LARGE:
-      digitalWrite(*(lcd.controlPins + FS), LOW);
+      digitalWrite(lcd.controlPins[FS], LOW);
       break;
   }
+}
+uint8_t writeByte(char byte) {
+  int i;
+  char tmp;
+
+  // set the bits on the data bus
+  for (i = 0; i < BYTE; i++) {
+    tmp = byte << ((BYTE - 1) - i);
+    tmp >>= (BYTE - 1);
+    lcd.dataPins[i] = tmp;
+    if (tmp) {
+      digitalWrite(lcd.dataPins[i], HIGH);
+    } else {
+      digitalWrite(lcd.dataPins[i], LOW);
+    }
+  }
+
+  // set and/or pulse the control lines
+  setCD(DATA);
+  setRW(WRITE);
+  setCE(ON);
+  // delay 80ns
+  for (i = 0; i < 8; i++) {
+    asm("nop");
+  }
+  setCE(OFF);
+
+  return SUCCESS;
+}
+
+uint8_t readByte(char * byte) {
+  int i;
+
+  // set and/or pulse control lines
+  setCD(DATA);
+  setRW(READ);
+  setCE(ON);
+
+  // delay 150ns
+  for (i = 0; i < 15; i++) {
+    asm("nop");
+  }
+  // read the bits on the data bus
+  for (i = 0; i < BYTE; i++) {
+    lcd.dataPins[i] = digitalRead(lcd.dataPins[i]) == HIGH ? 1 : 0;
+    *byte |= (lcd.dataPins[i] << i);
+  }
+  setCE(OFF);
+
+  return SUCCESS;
+}
+
+uint8_t writeCommand(char byte) {
+  int i;
+  char tmp;
+  
+  // set the bits on the data bus for the command id
+  for (i = 0; i < BYTE; i++) {
+    tmp = (byte << ((BYTE - 1) - i)) >> (BYTE - 1);
+    lcd.dataPins[i] = tmp;
+    if (tmp) {
+      digitalWrite(lcd.dataPins[i], HIGH);
+    } else {
+      digitalWrite(lcd.dataPins[i], LOW);
+    }
+  }
+
+  setCD(COMMAND);
+  setRW(WRITE);
+  setCE(ON);
+  // delay 80ns
+  for (i = 0; i < 8; i++) {
+    asm("nop");
+  }
+  setCE(OFF);
+
+  return SUCCESS;
+
 }
