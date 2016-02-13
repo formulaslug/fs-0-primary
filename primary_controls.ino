@@ -136,7 +136,7 @@ Left off trying to finish lcd initialization by setting the graphics home addres
   if (setupIncomplete) {
     // Init LCD
     delay(1000);
-    if (!LcdInit(240, 64, 6, BCK_FULL, controlPins, dataPins, LCD_BACKLIGHT_VIN_PIN)) {
+    if (!LcdInit(240, 64, 8, BCK_FULL, controlPins, dataPins, LCD_BACKLIGHT_VIN_PIN)) {
       Serial.println("Error: LCD Failed to Initialize");
     } else {
       Serial.println("Status: Ready");

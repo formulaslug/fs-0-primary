@@ -20,7 +20,9 @@ void setCD(uint8_t value);
 void setCE(uint8_t value);
 void triggerRST();
 void setFS(uint8_t value);
-uint8_t writeByte(char byte);
+uint8_t writeData(uint8_t byte);
+uint8_t readData(uint8_t * byte);
+uint8_t writeCommand(uint8_t byte);
 
 // function defintions
 uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t brightness, uint8_t * controlPins, uint8_t * dataPins, uint8_t backlightPin)
@@ -86,6 +88,101 @@ uint8_t LcdInit(uint16_t lcdWidth, uint16_t lcdHeight, uint8_t fontSize, uint8_t
   /*   delay(250); */
   /*   LCDSetBrightness(BCK_FULL, 0); */
   /* } */
+
+
+  // Setting "GRAPHICS HOME ADDRESS"
+  uint8_t data[2], command;
+  data[0] = 0x00;
+  data[1] = 0x40; // to 128
+  command = 0x42;
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[0]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[1]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+
+  // Set "GRAPHICS AREA SET"
+  data[0] = 0x1e;
+  data[1] = 0x00; // to 128
+  command = 0x43;
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[0]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[1]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+  
+
+  // Setting "TEXT HOME ADDRESS"
+  data[0] = 0x41; // from 129
+  data[1] = 0xff; // to 256
+  command = 0x40;
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[0]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[1]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+
+
+  // Set "TEXT AREA SET"
+  data[0] = 0x1e;
+  data[1] = 0x00;
+  command = 0x41;
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[0]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeData(data[1]);
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+
+
+  // Set "MODE SET"
+  command = 0x84; // 10000100 - MODE SET command, CG-ROM mode, Text only (attribute) mode
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+
+
+  // Set "DISPLAY MODE"
+  command = 0x9f; // 10011111 - DISPLAY MODE command, GRPH on (b/c txt attribute mode), TEXT on, CUR on, BLK on
+  if (!LCDWaitUntilReady()) {
+    return FAILURE;
+  }
+  writeCommand(command);
+
+  
+
+  
+
+
+
 
 
   // show feedback that lcd has been initialized
@@ -177,6 +274,21 @@ uint8_t LCDSetBrightness(uint8_t value, int delayTime)
   return 1;
 }
 
+/*
+ * @param
+ */
+uint8_t LCDSetGraphicsHomeAddress()
+{
+  return FAILURE;
+  // wait until status=ready
+  // send first data byte (low address byte)
+  // wait until status=ready
+  // send second data byte (high address byte)
+  // wait until status=ready
+  // send command to set graphics home address given previously received bytes
+}
+
+
 
 
 
@@ -260,15 +372,14 @@ void setFS(uint8_t value)
       break;
   }
 }
-uint8_t writeByte(char byte) {
+uint8_t writeData(uint8_t byte) {
   int i;
-  char tmp;
+  uint8_t tmp;
 
   // set the bits on the data bus
   for (i = 0; i < BYTE; i++) {
     tmp = byte << ((BYTE - 1) - i);
     tmp >>= (BYTE - 1);
-    lcd.dataPins[i] = tmp;
     if (tmp) {
       digitalWrite(lcd.dataPins[i], HIGH);
     } else {
@@ -281,16 +392,19 @@ uint8_t writeByte(char byte) {
   setRW(WRITE);
   setCE(ON);
   // delay 80ns
-  for (i = 0; i < 8; i++) {
-    asm("nop");
-  }
+  //
+  delay(1);
+  /* for (i = 0; i < 8; i++) { */
+  /*   asm("nop"); */
+  /* } */
   setCE(OFF);
 
   return SUCCESS;
 }
 
-uint8_t readByte(char * byte) {
+uint8_t readData(uint8_t * byte) {
   int i;
+  uint8_t tmp;
 
   // set and/or pulse control lines
   setCD(DATA);
@@ -303,22 +417,21 @@ uint8_t readByte(char * byte) {
   }
   // read the bits on the data bus
   for (i = 0; i < BYTE; i++) {
-    lcd.dataPins[i] = digitalRead(lcd.dataPins[i]) == HIGH ? 1 : 0;
-    *byte |= (lcd.dataPins[i] << i);
+    tmp = digitalRead(lcd.dataPins[i]) == HIGH ? 1 : 0;
+    *byte |= (tmp << i);
   }
   setCE(OFF);
 
   return SUCCESS;
 }
 
-uint8_t writeCommand(char byte) {
+uint8_t writeCommand(uint8_t byte) {
   int i;
-  char tmp;
+  uint8_t tmp;
   
   // set the bits on the data bus for the command id
   for (i = 0; i < BYTE; i++) {
     tmp = (byte << ((BYTE - 1) - i)) >> (BYTE - 1);
-    lcd.dataPins[i] = tmp;
     if (tmp) {
       digitalWrite(lcd.dataPins[i], HIGH);
     } else {
@@ -330,9 +443,10 @@ uint8_t writeCommand(char byte) {
   setRW(WRITE);
   setCE(ON);
   // delay 80ns
-  for (i = 0; i < 8; i++) {
-    asm("nop");
-  }
+  delay(1);
+  /* for (i = 0; i < 8; i++) { */
+  /*   asm("nop"); */
+  /* } */
   setCE(OFF);
 
   return SUCCESS;
