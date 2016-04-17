@@ -51,14 +51,14 @@ int main() {
         txMsg.buf[i] = '0' + i;
       }
 
-      digitalWriteFast(13, 1);
+      digitalWriteFast(LED_BUILTIN, 1);
       for (uint32_t i = 0; i < 6; i++) {
         if (!canBus.write(txMsg)) {
           Serial.println("tx failed");
         }
         txMsg.buf[0]++;
       }
-      digitalWriteFast(13, 0);
+      digitalWriteFast(LED_BUILTIN, 0);
     }
 
     if (rxTimer.isExpired()) {
