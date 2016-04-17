@@ -12,14 +12,14 @@
 #include "Timer.h"
 #include "Vehicle.h"
 
-static const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 5};
-static const std::array<uint8_t, NUM_BUTTONS> gButtonPins{7, 8};
+int main() {
+  const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 5};
+  const std::array<uint8_t, NUM_BUTTONS> gButtonPins{7, 8};
 
-static constexpr uint32_t k_ID = 0x680;
-static constexpr uint32_t k_baudRate = 500000;
-static constexpr uint8_t TORQUE_INPUT = A9;
+  constexpr uint32_t k_ID = 0x680;
+  constexpr uint32_t k_baudRate = 500000;
+  constexpr uint8_t TORQUE_INPUT = A9;
 
-void setup() {
   Serial.begin(9600);
 
   // Init LEDs
@@ -30,121 +30,121 @@ void setup() {
   for (auto& buttonPin : gButtonPins) {
     pinMode(buttonPin, INPUT);
   }
-}
 
-void loop() {
-  static Vehicle vehicle;
+  Vehicle vehicle;
 
-  static CANopen canBus(k_ID, k_baudRate);
-  static CAN_message_t txMsg;
-  static CAN_message_t rxMsg;
+  CANopen canBus(k_ID, k_baudRate);
+  CAN_message_t txMsg;
+  CAN_message_t rxMsg;
 
-  static Timer txTimer(100);
-  static Timer rxTimer(3);
+  Timer txTimer(100);
+  Timer rxTimer(3);
 
-  txTimer.update();
-  rxTimer.update();
+  while (1) {
+    txTimer.update();
+    rxTimer.update();
 
-  if (txTimer.isExpired()) {
-    txMsg.len = 8;
-    txMsg.id = 0x222;
-    for (uint32_t i = 0; i < 8; i++) {
-      txMsg.buf[i] = '0' + i;
-    }
-
-    digitalWrite(13, 1);
-    for (uint32_t i = 0; i < 6; i++) {
-      if (!canBus.write(txMsg)) {
-        Serial.println("tx failed");
-      }
-      txMsg.buf[0]++;
-    }
-    digitalWrite(13, 0);
-  }
-
-  if (rxTimer.isExpired()) {
-    while (canBus.read(rxMsg)) {
-      Serial.print(rxMsg.id, HEX);
+    if (txTimer.isExpired()) {
+      txMsg.len = 8;
+      txMsg.id = 0x222;
       for (uint32_t i = 0; i < 8; i++) {
-        Serial.print(":");
-        Serial.print(rxMsg.buf[i], HEX);
+        txMsg.buf[i] = '0' + i;
       }
-      Serial.print("\r\n");
+
+      digitalWrite(13, 1);
+      for (uint32_t i = 0; i < 6; i++) {
+        if (!canBus.write(txMsg)) {
+          Serial.println("tx failed");
+        }
+        txMsg.buf[0]++;
+      }
+      digitalWrite(13, 0);
     }
-  }
 
-  // Vehicle's main state machine (FSM)
-  switch (vehicle.state) {
-    case LV_STARTUP:
-      // Perform LV_STARTUP functions HERE
-
-      vehicle.state = LV_ACTIVE;
-      break;
-    case LV_ACTIVE:
-      // Set LED feedback
-      vehicle.ledStates[BLUE] = LED_ON;
-      vehicle.ledStates[YELLOW] = LED_OFF;
-      vehicle.ledStates[RED] = LED_OFF;
-
-      // Wait to move to HV_STARTUP
-      if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
-        vehicle.state = HV_STARTUP;
+    if (rxTimer.isExpired()) {
+      while (canBus.read(rxMsg)) {
+        Serial.print(rxMsg.id, HEX);
+        for (uint32_t i = 0; i < 8; i++) {
+          Serial.print(":");
+          Serial.print(rxMsg.buf[i], HEX);
+        }
+        Serial.print("\r\n");
       }
-      break;
-    case HV_SHUTDOWN:
-      // Perform HV_SHUTDOWN functions HERE
+    }
 
-      // Transition to LV_ACTIVE
-      vehicle.state = LV_ACTIVE;
-      break;
-    case HV_STARTUP:
-      // Perform LV_STARTUP functions HERE
+    // Vehicle's main state machine (FSM)
+    switch (vehicle.state) {
+      case LV_STARTUP:
+        // Perform LV_STARTUP functions HERE
 
-      vehicle.state = HV_ACTIVE;
-      break;
-    case HV_ACTIVE:
-      // Set LED feedback
-      vehicle.ledStates[BLUE] = LED_ON;
-      vehicle.ledStates[YELLOW] = LED_ON;
-      vehicle.ledStates[RED] = LED_OFF;
+        vehicle.state = LV_ACTIVE;
+        break;
+      case LV_ACTIVE:
+        // Set LED feedback
+        vehicle.ledStates[BLUE] = LED_ON;
+        vehicle.ledStates[YELLOW] = LED_OFF;
+        vehicle.ledStates[RED] = LED_OFF;
 
-      // Wait to move to RTD_STARTUP until user input
-      if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
-        vehicle.state = RTD_STARTUP;
-      } else if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
-        // Or move back to LV active
-        vehicle.state = HV_SHUTDOWN;
-      }
-      break;
-    case RTD_SHUTDOWN:
-      // Perform HV_SHUTDOWN functions HERE
+        // Wait to move to HV_STARTUP
+        if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
+          vehicle.state = HV_STARTUP;
+        }
+        break;
+      case HV_SHUTDOWN:
+        // Perform HV_SHUTDOWN functions HERE
 
-      vehicle.state = HV_ACTIVE;
-      break;
-    case RTD_STARTUP:
-      // Perform LV_STARTUP functions HERE
+        // Transition to LV_ACTIVE
+        vehicle.state = LV_ACTIVE;
+        break;
+      case HV_STARTUP:
+        // Perform LV_STARTUP functions HERE
 
-      // Show entire system is hot
-      vehicle.ledStates[BLUE] = LED_ON;
-      vehicle.ledStates[YELLOW] = LED_ON;
-      vehicle.ledStates[RED] = LED_ON;
+        vehicle.state = HV_ACTIVE;
+        break;
+      case HV_ACTIVE:
+        // Set LED feedback
+        vehicle.ledStates[BLUE] = LED_ON;
+        vehicle.ledStates[YELLOW] = LED_ON;
+        vehicle.ledStates[RED] = LED_OFF;
 
-      vehicle.state = RTD_ACTIVE;
-      break;
-    case RTD_ACTIVE:
-      // Get speed
-      vehicle.dynamics.torque = static_cast<int>(analogRead(TORQUE_INPUT) / 2);
+        // Wait to move to RTD_STARTUP until user input
+        if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+          vehicle.state = RTD_STARTUP;
+        } else if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
+          // Or move back to LV active
+          vehicle.state = HV_SHUTDOWN;
+        }
+        break;
+      case RTD_SHUTDOWN:
+        // Perform HV_SHUTDOWN functions HERE
 
-      // Show speed
-      vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];
+        vehicle.state = HV_ACTIVE;
+        break;
+      case RTD_STARTUP:
+        // Perform LV_STARTUP functions HERE
 
-      // Wait to transition back
-      if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
-        // Start moving back to HV_ACTIVE
-        vehicle.ledStates[SPEED] = LED_OFF;
-        vehicle.dynamics.torque = 50;
-        vehicle.state = RTD_SHUTDOWN;
-      }
-      break;
+        // Show entire system is hot
+        vehicle.ledStates[BLUE] = LED_ON;
+        vehicle.ledStates[YELLOW] = LED_ON;
+        vehicle.ledStates[RED] = LED_ON;
+
+        vehicle.state = RTD_ACTIVE;
+        break;
+      case RTD_ACTIVE:
+        // Get speed
+        vehicle.dynamics.torque = static_cast<int>(analogRead(TORQUE_INPUT) / 2);
+
+        // Show speed
+        vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];
+
+        // Wait to transition back
+        if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+          // Start moving back to HV_ACTIVE
+          vehicle.ledStates[SPEED] = LED_OFF;
+          vehicle.dynamics.torque = 50;
+          vehicle.state = RTD_SHUTDOWN;
+        }
+        break;
+    }
   }
 }
