@@ -51,14 +51,14 @@ int main() {
         txMsg.buf[i] = '0' + i;
       }
 
-      digitalWrite(13, 1);
+      digitalWriteFast(13, 1);
       for (uint32_t i = 0; i < 6; i++) {
         if (!canBus.write(txMsg)) {
           Serial.println("tx failed");
         }
         txMsg.buf[0]++;
       }
-      digitalWrite(13, 0);
+      digitalWriteFast(13, 0);
     }
 
     if (rxTimer.isExpired()) {
@@ -86,7 +86,7 @@ int main() {
         vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to HV_STARTUP
-        if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
+        if (digitalReadFast(gButtonPins[HV_TOGGLE]) == LOW) {
           vehicle.state = HV_STARTUP;
         }
         break;
@@ -108,9 +108,9 @@ int main() {
         vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to RTD_STARTUP until user input
-        if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(gButtonPins[RTD_TOGGLE]) == LOW) {
           vehicle.state = RTD_STARTUP;
-        } else if (digitalRead(gButtonPins[HV_TOGGLE]) == LOW) {
+        } else if (digitalReadFast(gButtonPins[HV_TOGGLE]) == LOW) {
           // Or move back to LV active
           vehicle.state = HV_SHUTDOWN;
         }
@@ -138,7 +138,7 @@ int main() {
         vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];
 
         // Wait to transition back
-        if (digitalRead(gButtonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(gButtonPins[RTD_TOGGLE]) == LOW) {
           // Start moving back to HV_ACTIVE
           vehicle.ledStates[SPEED] = LED_OFF;
           vehicle.dynamics.torque = 50;
