@@ -1,7 +1,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include <Metro.h>
+#include <cstdint>
 
 class Timer {
  public:
@@ -15,7 +15,8 @@ class Timer {
   const uint32_t m_timeout;
   uint32_t m_count;
 
-  Metro m_sysTimer{1}; // ms
+  uint8_t m_autoreset = 0;
+  unsigned long m_previous_millis, m_interval_millis = 1;
 };
 
 #endif // TIMER_H

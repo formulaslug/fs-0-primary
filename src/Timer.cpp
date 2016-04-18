@@ -1,14 +1,33 @@
 #include "Timer.h"
 
+#if defined(ARDUINO) && ARDUINO >= 100
+  #include "Arduino.h"
+#else
+  #include "WProgram.h"
+#endif
+
 Timer::Timer(uint32_t timeout) : m_timeout(timeout) {
   m_count = timeout;
-
-  m_sysTimer.reset();
+  m_previous_millis = millis();
 }
 
 void Timer::update() {
-  if (m_sysTimer.check() && m_count != 0) {
-    m_count--;
+  if (millis() - m_previous_millis >= m_interval_millis) {
+    // As suggested by benjamin.soelberg@gmail.com, the following line
+    // m_previous_millis = millis();
+    // was changed to
+    // m_previous_millis += m_interval_millis;
+
+    // If the interval is set to 0 we revert to the original behavior
+    if (m_interval_millis <= 0 || m_autoreset) {
+      m_previous_millis = millis();
+    } else {
+      m_previous_millis += m_interval_millis;
+    }
+
+    if (m_count != 0) {
+      m_count--;
+    }
   }
 }
 
