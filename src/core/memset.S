@@ -31,9 +31,9 @@
 .align 2
 
 /* void *memset(void *s, int c, size_t n); */
-	.type	memset, %function
-	.thumb_func
-	memset:
+    .type	memset, %function
+    .thumb_func
+    memset:
 //FUNCTION(memset)
     // save the original pointer
     push    { r0, lr }
@@ -70,7 +70,7 @@
 
 .L_dwordwise:
     // dwordwise memset
-		
+
     subs    r3, r3, #1
     strd    r1, r12, [r0], #8
     bgt     .L_dwordwise

@@ -41,7 +41,6 @@
 #if F_CPU >= 20000000 && defined(NUM_ENDPOINTS)
 
   #include "kinetis.h"
-//#include "HardwareSerial.h"
   #include "usb_mem.h"
 
 // buffer descriptor table
@@ -144,14 +143,6 @@ static void endpoint0_stall(void) {
 
 
 static void endpoint0_transmit(const void* data, uint32_t len) {
-  #if 0
-  serial_print("tx0:");
-  serial_phex32((uint32_t) data);
-  serial_print(",");
-  serial_phex16(len);
-  serial_print(ep0_tx_bdt_bank ? ", odd" : ", even");
-  serial_print(ep0_tx_data_toggle ? ", d1\n" : ", d0\n");
-  #endif
   table[index(0, TX, ep0_tx_bdt_bank)].addr = (void*) data;
   table[index(0, TX, ep0_tx_bdt_bank)].desc = BDT_DESC(len, ep0_tx_data_toggle);
   ep0_tx_data_toggle ^= 1;
@@ -174,7 +165,6 @@ static void usb_setup(void) {
     case 0x0500: // SET_ADDRESS
       break;
     case 0x0900: // SET_CONFIGURATION
-      //serial_print("configure\n");
       usb_configuration = setup.wValue;
       reg = &USB0_ENDPT1;
       cfg = usb_endpoint_config_table;
@@ -291,13 +281,8 @@ static void usb_setup(void) {
       break;
     case 0x0680: // GET_DESCRIPTOR
     case 0x0681:
-      //serial_print("desc:");
-      //serial_phex16(setup.wValue);
-      //serial_print("\n");
       for (list = usb_descriptor_list; 1; list++) {
         if (list->addr == NULL) { break; }
-        //if (setup.wValue == list->wValue &&
-        //(setup.wIndex == list->wIndex) || ((setup.wValue >> 8) == 3)) {
         if (setup.wValue == list->wValue && setup.wIndex == list->wIndex) {
           data = list->addr;
           if ((setup.wValue >> 8) == 3) {
@@ -308,24 +293,9 @@ static void usb_setup(void) {
           } else {
             datalen = list->length;
           }
-  #if 0
-          serial_print("Desc found, ");
-          serial_phex32((uint32_t) data);
-          serial_print(",");
-          serial_phex16(datalen);
-          serial_print(",");
-          serial_phex(data[0]);
-          serial_phex(data[1]);
-          serial_phex(data[2]);
-          serial_phex(data[3]);
-          serial_phex(data[4]);
-          serial_phex(data[5]);
-          serial_print("\n");
-  #endif
           goto send;
         }
       }
-      //serial_print("desc: not found\n");
       endpoint0_stall();
       return;
 
@@ -333,55 +303,19 @@ static void usb_setup(void) {
     case 0x2221: // CDC_SET_CONTROL_LINE_STATE
       usb_cdc_line_rtsdtr_millis = systick_millis_count;
       usb_cdc_line_rtsdtr = setup.wValue;
-      //serial_print("set control line state\n");
       break;
     case 0x2321: // CDC_SEND_BREAK
       break;
     case 0x2021: // CDC_SET_LINE_CODING
-      //serial_print("set coding, waiting...\n");
       return;
 
   #endif
 
-  #if defined(MTP_INTERFACE)
-    case 0x2164: // Cancel Request (PTP spec, 5.2.1, page 8)
-      // TODO: required by PTP spec
-      endpoint0_stall();
-      return;
-
-    case 0x2166: // Device Reset (PTP spec, 5.2.3, page 10)
-      // TODO: required by PTP spec
-      endpoint0_stall();
-      return;
-
-    case 0x2167: // Get Device Statis (PTP spec, 5.2.4, page 10)
-      // TODO: required by PTP spec
-      endpoint0_stall();
-      return;
-
-  #endif
-
-      // TODO: this does not work... why?
-  #if defined(SEREMU_INTERFACE) || defined(KEYBOARD_INTERFACE)
-    case 0x0921: // HID SET_REPORT
-      //serial_print(":)\n");
-      return;
-
-    case 0x0A21: // HID SET_IDLE
-      break;
-      // case 0xC940:
-  #endif
     default:
       endpoint0_stall();
       return;
   }
 send:
-  //serial_print("setup send ");
-  //serial_phex32(data);
-  //serial_print(",");
-  //serial_phex16(datalen);
-  //serial_print("\n");
-
   if (datalen > setup.wLength) {datalen = setup.wLength; }
   size = datalen;
   if (size > EP0_SIZE) {size = EP0_SIZE; }
@@ -401,8 +335,6 @@ send:
   ep0_tx_len = datalen;
 }
 
-
-
 //A bulk endpoint's toggle sequence is initialized to DATA0 when the endpoint
 //experiences any configuration event (configuration events are explained in
 //Sections 9.1.1.5 and 9.4.5).
@@ -416,10 +348,6 @@ send:
 //Halt feature set, a ClearFeature(ENDPOINT_HALT) request always results in the
 //data toggle being reinitialized to DATA0.
 
-
-
-// #define stat2bufferdescriptor(stat) (table + ((stat) >> 2))
-
 static void usb_control(uint32_t stat) {
   bdt_t* b;
   uint32_t pid, size;
@@ -430,16 +358,9 @@ static void usb_control(uint32_t stat) {
   pid = BDT_PID(b->desc);
   //count = b->desc >> 16;
   buf = b->addr;
-  //serial_print("pid:");
-  //serial_phex(pid);
-  //serial_print(", count:");
-  //serial_phex(count);
-  //serial_print("\n");
 
   switch (pid) {
     case 0x0D: // Setup received from host
-      //serial_print("PID=Setup\n");
-      //if (count != 8) ; // panic?
       // grab the 8 byte setup info
       setup.word1 = *(uint32_t*) (buf);
       setup.word2 = *(uint32_t*) (buf + 4);
@@ -452,30 +373,11 @@ static void usb_control(uint32_t stat) {
       // clear any leftover pending IN transactions
       ep0_tx_ptr = NULL;
       if (ep0_tx_data_toggle) {}
-      //if (table[index(0, TX, EVEN)].desc & 0x80) {
-      //serial_print("leftover tx even\n");
-      //}
-      //if (table[index(0, TX, ODD)].desc & 0x80) {
-      //serial_print("leftover tx odd\n");
-      //}
       table[index(0, TX, EVEN)].desc = 0;
       table[index(0, TX, ODD)].desc = 0;
       // first IN after Setup is always DATA1
       ep0_tx_data_toggle = 1;
 
-  #if 0
-      serial_print("bmRequestType:");
-      serial_phex(setup.bmRequestType);
-      serial_print(", bRequest:");
-      serial_phex(setup.bRequest);
-      serial_print(", wValue:");
-      serial_phex16(setup.wValue);
-      serial_print(", wIndex:");
-      serial_phex16(setup.wIndex);
-      serial_print(", len:");
-      serial_phex16(setup.wLength);
-      serial_print("\n");
-  #endif
       // actually "do" the setup request
       usb_setup();
       // unfreeze the USB, now that we're ready
@@ -499,31 +401,11 @@ static void usb_control(uint32_t stat) {
         endpoint0_transmit(NULL, 0);
       }
   #endif
-  #ifdef KEYBOARD_INTERFACE
-      if (setup.word1 == 0x02000921 &&
-          setup.word2 == ((1 << 16) | KEYBOARD_INTERFACE)) {
-        keyboard_leds = buf[0];
-        endpoint0_transmit(NULL, 0);
-      }
-  #endif
-  #ifdef SEREMU_INTERFACE
-      if (setup.word1 == 0x03000921 &&
-          setup.word2 == ((4 << 16) | SEREMU_INTERFACE)
-          && buf[0] == 0xA9 && buf[1] == 0x45 && buf[2] == 0xC2 &&
-          buf[3] == 0x6B) {
-        usb_reboot_timer = 5;
-        endpoint0_transmit(NULL, 0);
-      }
-  #endif
       // give the buffer back
       b->desc = BDT_DESC(EP0_SIZE, DATA1);
       break;
 
     case 0x09: // IN transaction completed to host
-      //serial_print("PID=IN:");
-      //serial_phex(stat);
-      //serial_print("\n");
-
       // send remaining data, if any...
       data = ep0_tx_ptr;
       if (data) {
@@ -537,25 +419,13 @@ static void usb_control(uint32_t stat) {
 
       if (setup.bRequest == 5 && setup.bmRequestType == 0) {
         setup.bRequest = 0;
-        //serial_print("set address: ");
-        //serial_phex16(setup.wValue);
-        //serial_print("\n");
         USB0_ADDR = setup.wValue;
       }
 
       break;
-      //default:
-      //serial_print("PID=unknown:");
-      //serial_phex(pid);
-      //serial_print("\n");
   }
   USB0_CTL = USB_CTL_USBENSOFEN; // clear TXSUSPENDTOKENBUSY bit
 }
-
-
-
-
-
 
 usb_packet_t* usb_rx(uint32_t endpoint) {
   usb_packet_t* ret;
@@ -568,11 +438,6 @@ usb_packet_t* usb_rx(uint32_t endpoint) {
     usb_rx_byte_count_data[endpoint] -= ret->len;
   }
   __enable_irq();
-  //serial_print("rx, epidx=");
-  //serial_phex(endpoint);
-  //serial_print(", packet=");
-  //serial_phex32(ret);
-  //serial_print("\n");
   return ret;
 }
 
@@ -586,17 +451,6 @@ static uint32_t usb_queue_byte_count(const usb_packet_t* p) {
   __enable_irq();
   return count;
 }
-
-// TODO: make this an inline function...
-/*
-uint32_t usb_rx_byte_count(uint32_t endpoint)
-{
-  endpoint--;
-  if (endpoint >= NUM_ENDPOINTS) return 0;
-  return usb_rx_byte_count_data[endpoint];
-  //return usb_queue_byte_count(rx_first[endpoint]);
-}
-*/
 
 uint32_t usb_tx_byte_count(uint32_t endpoint) {
   endpoint--;
@@ -617,7 +471,6 @@ uint32_t usb_tx_packet_count(uint32_t endpoint) {
   __enable_irq();
   return count;
 }
-
 
 // Called from usb_free, but only when usb_rx_memory_needed > 0, indicating
 // receive endpoints are starving for memory.  The intention is to give
@@ -641,8 +494,6 @@ void usb_rx_memory(usb_packet_t* packet) {
         table[index(i, RX, EVEN)].desc = BDT_DESC(64, 0);
         usb_rx_memory_needed--;
         __enable_irq();
-        //serial_phex(i);
-        //serial_print(",even\n");
         return;
       }
       if (table[index(i, RX, ODD)].desc == 0) {
@@ -650,8 +501,6 @@ void usb_rx_memory(usb_packet_t* packet) {
         table[index(i, RX, ODD)].desc = BDT_DESC(64, 1);
         usb_rx_memory_needed--;
         __enable_irq();
-        //serial_phex(i);
-        //serial_print(",odd\n");
         return;
       }
     }
@@ -664,9 +513,6 @@ void usb_rx_memory(usb_packet_t* packet) {
   usb_free(packet);
 }
 
-//#define index(endpoint, tx, odd) (((endpoint) << 2) | ((tx) << 1) | (odd))
-//#define stat2bufferdescriptor(stat) (table + ((stat) >> 2))
-
 void usb_tx(uint32_t endpoint, usb_packet_t* packet) {
   bdt_t* b = &table[index(endpoint, TX, EVEN)];
   uint8_t next;
@@ -674,9 +520,6 @@ void usb_tx(uint32_t endpoint, usb_packet_t* packet) {
   endpoint--;
   if (endpoint >= NUM_ENDPOINTS) {return; }
   __disable_irq();
-  //serial_print("txstate=");
-  //serial_phex(tx_state[endpoint]);
-  //serial_print("\n");
   switch (tx_state[endpoint]) {
     case TX_STATE_BOTH_FREE_EVEN_FIRST:
       next = TX_STATE_ODD_FREE;
@@ -708,25 +551,14 @@ void usb_tx(uint32_t endpoint, usb_packet_t* packet) {
   __enable_irq();
 }
 
-
-
-
-
-
 void _reboot_Teensyduino_(void) {
   // TODO: initialize R0 with a code....
   __asm__ volatile ("bkpt");
 }
 
-
-
 void usb_isr(void) {
   uint8_t status, stat, t;
 
-  //serial_print("isr");
-  //status = USB0_ISTAT;
-  //serial_phex(status);
-  //serial_print("\n");
 restart:
   status = USB0_ISTAT;
 
@@ -744,19 +576,6 @@ restart:
         if (t == 0) {usb_serial_flush_callback(); }
       }
   #endif
-  #ifdef SEREMU_INTERFACE
-      t = usb_seremu_transmit_flush_timer;
-      if (t) {
-        usb_seremu_transmit_flush_timer = --t;
-        if (t == 0) {usb_seremu_flush_callback(); }
-      }
-  #endif
-  #ifdef MIDI_INTERFACE
-      usb_midi_flush_output();
-  #endif
-  #ifdef FLIGHTSIM_INTERFACE
-      usb_flightsim_flush_callback();
-  #endif
     }
     USB0_ISTAT = USB_ISTAT_SOFTOK;
   }
@@ -764,33 +583,18 @@ restart:
   if ((status & USB_ISTAT_TOKDNE /* 08 */)) {
     uint8_t endpoint;
     stat = USB0_STAT;
-    //serial_print("token: ep=");
-    //serial_phex(stat >> 4);
-    //serial_print(stat & 0x08 ? ",tx" : ",rx");
-    //serial_print(stat & 0x04 ? ",odd\n" : ",even\n");
     endpoint = stat >> 4;
     if (endpoint == 0) {
       usb_control(stat);
     } else {
       bdt_t* b = stat2bufferdescriptor(stat);
       usb_packet_t* packet = (usb_packet_t*) ((uint8_t*) (b->addr) - 8);
-  #if 0
-      serial_print("ep:");
-      serial_phex(endpoint);
-      serial_print(", pid:");
-      serial_phex(BDT_PID(b->desc));
-      serial_print(((uint32_t) b & 8) ? ", odd" : ", even");
-      serial_print(", count:");
-      serial_phex(b->desc >> 16);
-      serial_print("\n");
-  #endif
       endpoint--; // endpoint is index to zero-based arrays
 
       if (stat & 0x08) { // transmit
         usb_free(packet);
         packet = tx_first[endpoint];
         if (packet) {
-          //serial_print("tx packet\n");
           tx_first[endpoint] = packet->next;
           b->addr = packet->buf;
           switch (tx_state[endpoint]) {
@@ -811,7 +615,6 @@ restart:
           }
           b->desc = BDT_DESC(packet->len, ((uint32_t) b & 8) ? DATA1 : DATA0);
         } else {
-          //serial_print("tx no packet\n");
           switch (tx_state[endpoint]) {
             case TX_STATE_BOTH_FREE_EVEN_FIRST:
             case TX_STATE_BOTH_FREE_ODD_FIRST:
@@ -834,18 +637,8 @@ restart:
           packet->index = 0;
           packet->next = NULL;
           if (rx_first[endpoint] == NULL) {
-            //serial_print("rx 1st, epidx=");
-            //serial_phex(endpoint);
-            //serial_print(", packet=");
-            //serial_phex32((uint32_t)packet);
-            //serial_print("\n");
             rx_first[endpoint] = packet;
           } else {
-            //serial_print("rx Nth, epidx=");
-            //serial_phex(endpoint);
-            //serial_print(", packet=");
-            //serial_phex32((uint32_t)packet);
-            //serial_print("\n");
             rx_last[endpoint]->next = packet;
           }
           rx_last[endpoint] = packet;
@@ -858,9 +651,6 @@ restart:
             b->addr = packet->buf;
             b->desc = BDT_DESC(64, ((uint32_t) b & 8) ? DATA1 : DATA0);
           } else {
-            //serial_print("starving ");
-            //serial_phex(endpoint + 1);
-            //serial_print(((uint32_t)b & 8) ? ",odd\n" : ",even\n");
             b->desc = 0;
             usb_rx_memory_needed++;
           }
@@ -873,11 +663,7 @@ restart:
     goto restart;
   }
 
-
-
   if (status & USB_ISTAT_USBRST /* 01 */) {
-    //serial_print("reset\n");
-
     // initialize BDT toggle bits
     USB0_CTL = USB_CTL_ODDRST;
     ep0_tx_bdt_bank = 0;
@@ -916,16 +702,12 @@ restart:
 
 
   if ((status & USB_ISTAT_STALL /* 80 */)) {
-    //serial_print("stall:\n");
     USB0_ENDPT0 = USB_ENDPT_EPRXEN | USB_ENDPT_EPTXEN | USB_ENDPT_EPHSHK;
     USB0_ISTAT = USB_ISTAT_STALL;
   }
   if ((status & USB_ISTAT_ERROR /* 02 */)) {
     uint8_t err = USB0_ERRSTAT;
     USB0_ERRSTAT = err;
-    //serial_print("err:");
-    //serial_phex(err);
-    //serial_print("\n");
     USB0_ISTAT = USB_ISTAT_ERROR;
   }
 
@@ -935,13 +717,8 @@ restart:
   }
 }
 
-
-
 void usb_init(void) {
   int i;
-
-  //serial_begin(BAUD2DIV(115200));
-  //serial_print("usb_init\n");
 
   usb_init_serialnumber();
 
@@ -961,8 +738,6 @@ void usb_init(void) {
   #endif
 
   // reset USB module
-  //USB0_USBTRC0 = USB_USBTRC_USBRESET;
-  //while ((USB0_USBTRC0 & USB_USBTRC_USBRESET) != 0) ; // wait for reset to end
 
   // set desc table base addr
   USB0_BDTPAGE1 = ((uint32_t) table) >> 8;
@@ -973,8 +748,6 @@ void usb_init(void) {
   USB0_ISTAT = 0xFF;
   USB0_ERRSTAT = 0xFF;
   USB0_OTGISTAT = 0xFF;
-
-  //USB0_USBTRC0 |= 0x40; // undocumented bit
 
   // enable USB
   USB0_CTL = USB_CTL_USBENSOFEN;
