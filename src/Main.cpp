@@ -132,7 +132,8 @@ int main() {
         break;
       case RTD_ACTIVE:
         // Get speed
-        vehicle.dynamics.torque = static_cast<int>(analogRead(TORQUE_INPUT) / 2);
+        vehicle.dynamics.torque =
+            static_cast<int>(analogRead(TORQUE_INPUT) / 2);
 
         // Show speed
         vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];

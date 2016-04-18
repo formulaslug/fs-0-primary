@@ -1,14 +1,12 @@
-
 #if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
+  #include "Arduino.h"
 #else
-#include "WProgram.h"
+  #include "WProgram.h"
 #endif
 #include "Metro.h"
 
 
-Metro::Metro(unsigned long interval_millis)
-{
+Metro::Metro(unsigned long interval_millis) {
   this->autoreset = 0;
   interval(interval_millis);
   reset();
@@ -19,15 +17,13 @@ Metro::Metro(unsigned long interval_millis)
 // autoreset = 0 is benjamin.soelberg's check behavior
 // autoreset != 0 is the original behavior
 
-Metro::Metro(unsigned long interval_millis, uint8_t autoreset)
-{
+Metro::Metro(unsigned long interval_millis, uint8_t autoreset) {
   this->autoreset = autoreset; // Fix by Paul Bouchier
   interval(interval_millis);
   reset();
 }
 
-void Metro::interval(unsigned long interval_millis)
-{
+void Metro::interval(unsigned long interval_millis) {
   this->interval_millis = interval_millis;
 }
 
@@ -39,8 +35,7 @@ void Metro::interval(unsigned long interval_millis)
 // When a check is true, add the interval to the current millis() counter.
 // This method can add a certain offset over time.
 
-char Metro::check()
-{
+char Metro::check() {
   if (millis() - this->previous_millis >= this->interval_millis) {
     // As suggested by benjamin.soelberg@gmail.com, the following line
     // this->previous_millis = millis();
@@ -48,7 +43,7 @@ char Metro::check()
     // this->previous_millis += this->interval_millis;
 
     // If the interval is set to 0 we revert to the original behavior
-    if (this->interval_millis <= 0 || this->autoreset ) {
+    if (this->interval_millis <= 0 || this->autoreset) {
       this->previous_millis = millis();
     } else {
       this->previous_millis += this->interval_millis;
@@ -59,9 +54,6 @@ char Metro::check()
   return 0;
 }
 
-void Metro::reset()
-{
+void Metro::reset() {
   this->previous_millis = millis();
 }
-
-

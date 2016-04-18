@@ -22,24 +22,21 @@ typedef struct CAN_filter_t {
 } CAN_filter_t;
 
 // -------------------------------------------------------------
-class FlexCAN
-{
-private:
+class FlexCAN {
+ private:
   struct CAN_filter_t defaultMask;
 
-public:
+ public:
   FlexCAN(uint32_t baud = 125000);
-  void begin(const CAN_filter_t &mask);
-  inline void begin()
-  {
+  void begin(const CAN_filter_t& mask);
+  inline void begin() {
     begin(defaultMask);
   }
-  void setFilter(const CAN_filter_t &filter, uint8_t n);
+  void setFilter(const CAN_filter_t& filter, uint8_t n);
   void end(void);
   int available(void);
-  int write(const CAN_message_t &msg);
-  int read(CAN_message_t &msg);
-
+  int write(const CAN_message_t& msg);
+  int read(CAN_message_t& msg);
 };
 
 #endif // __FLEXCAN_H__
