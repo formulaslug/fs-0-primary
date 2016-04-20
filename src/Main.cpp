@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <array>
 
-#include "CANopen.h"
+#include "core_controls/CANopen.h"
 #include "Timer.h"
 #include "Vehicle.h"
 
