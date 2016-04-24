@@ -8,16 +8,41 @@
 #include <cstdint>
 #include <array>
 
+#include <IntervalTimer.h>
 #include "core_controls/CANopen.h"
-#include "Timer.h"
 #include "Vehicle.h"
+
+constexpr uint32_t k_ID = 0x680;
+constexpr uint32_t k_baudRate = 500000;
+static CANopen* gCanBus = nullptr;
+
+static CAN_message_t gTxMsg;
+static CAN_message_t gRxMsg;
+
+void canTxISR() {
+  gTxMsg.len = 8;
+  gTxMsg.id = 0x222;
+  for (uint32_t i = 0; i < 8; i++) {
+    gTxMsg.buf[i] = '0' + i;
+  }
+
+  for (uint32_t i = 0; i < 6; i++) {
+    if (!gCanBus->sendMessage(gTxMsg)) {
+      Serial.println("tx failed");
+    }
+    gTxMsg.buf[0]++;
+  }
+}
+
+void canRxISR() {
+  while (gCanBus->recvMessage(gRxMsg)) {
+  }
+}
 
 int main() {
   const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 5};
   const std::array<uint8_t, NUM_BUTTONS> gButtonPins{7, 8};
 
-  constexpr uint32_t k_ID = 0x680;
-  constexpr uint32_t k_baudRate = 500000;
   constexpr uint8_t TORQUE_INPUT = A9;
 
   Serial.begin(9600);
@@ -33,45 +58,15 @@ int main() {
 
   Vehicle vehicle;
 
-  CANopen canBus(k_ID, k_baudRate);
-  CAN_message_t txMsg;
-  CAN_message_t rxMsg;
+  gCanBus = new CANopen(k_ID, k_baudRate);
 
-  Timer txTimer(100);
-  Timer rxTimer(3);
+  IntervalTimer canTxInterrupt;
+  canTxInterrupt.begin(canTxISR, 100000);
+
+  IntervalTimer canRxInterrupt;
+  canRxInterrupt.begin(canRxISR, 3000);
 
   while (1) {
-    txTimer.update();
-    rxTimer.update();
-
-    if (txTimer.isExpired()) {
-      txMsg.len = 8;
-      txMsg.id = 0x222;
-      for (uint32_t i = 0; i < 8; i++) {
-        txMsg.buf[i] = '0' + i;
-      }
-
-      digitalWriteFast(LED_BUILTIN, 1);
-      for (uint32_t i = 0; i < 6; i++) {
-        if (!canBus.write(txMsg)) {
-          Serial.println("tx failed");
-        }
-        txMsg.buf[0]++;
-      }
-      digitalWriteFast(LED_BUILTIN, 0);
-    }
-
-    if (rxTimer.isExpired()) {
-      while (canBus.read(rxMsg)) {
-        Serial.print(rxMsg.id, HEX);
-        for (uint32_t i = 0; i < 8; i++) {
-          Serial.print(":");
-          Serial.print(rxMsg.buf[i], HEX);
-        }
-        Serial.print("\r\n");
-      }
-    }
-
     // Vehicle's main state machine (FSM)
     switch (vehicle.state) {
       case LV_STARTUP:
