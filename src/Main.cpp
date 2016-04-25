@@ -12,8 +12,6 @@
 #include "core_controls/CANopen.h"
 #include "Vehicle.h"
 
-constexpr uint32_t k_ID = 0x680;
-constexpr uint32_t k_baudRate = 500000;
 static CANopen* gCanBus = nullptr;
 
 static CAN_message_t gTxMsg;
@@ -58,6 +56,8 @@ int main() {
 
   Vehicle vehicle;
 
+  constexpr uint32_t k_ID = 0x680;
+  constexpr uint32_t k_baudRate = 500000;
   gCanBus = new CANopen(k_ID, k_baudRate);
 
   IntervalTimer canTxInterrupt;
