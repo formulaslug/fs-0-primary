@@ -1,5 +1,4 @@
-/*
- * @desc Pimary control system for the UCSC's Formula Slug Electric FSAE Vehicle
+/* @desc Primary control system for the UCSC's FSAE Electric Vehicle
  * @dict LV = Low Voltage System, HV = High Voltage System, RTD = Ready-To-Drive
  */
 
@@ -12,30 +11,16 @@
 #include "core_controls/CANopen.h"
 #include "Vehicle.h"
 
+void _20msISR();
+void _3msISR();
+
+void canTx();
+void canRx();
+
 static CANopen* gCanBus = nullptr;
 
 static CAN_message_t gTxMsg;
 static CAN_message_t gRxMsg;
-
-void canTxISR() {
-  gTxMsg.len = 8;
-  gTxMsg.id = 0x222;
-  for (uint32_t i = 0; i < 8; i++) {
-    gTxMsg.buf[i] = '0' + i;
-  }
-
-  for (uint32_t i = 0; i < 6; i++) {
-    if (!gCanBus->sendMessage(gTxMsg)) {
-      Serial.println("tx failed");
-    }
-    gTxMsg.buf[0]++;
-  }
-}
-
-void canRxISR() {
-  while (gCanBus->recvMessage(gRxMsg)) {
-  }
-}
 
 int main() {
   const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 5};
@@ -43,7 +28,7 @@ int main() {
 
   constexpr uint8_t TORQUE_INPUT = A9;
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   // Init LEDs
   for (auto& ledPin : gLedPins) {
@@ -60,11 +45,11 @@ int main() {
   constexpr uint32_t k_baudRate = 500000;
   gCanBus = new CANopen(k_ID, k_baudRate);
 
-  IntervalTimer canTxInterrupt;
-  canTxInterrupt.begin(canTxISR, 100000);
+  IntervalTimer _20msInterrupt;
+  _20msInterrupt.begin(_20msISR, 100000);
 
-  IntervalTimer canRxInterrupt;
-  canRxInterrupt.begin(canRxISR, 3000);
+  IntervalTimer _3msInterrupt;
+  _3msInterrupt.begin(_3msISR, 3000);
 
   while (1) {
     // Vehicle's main state machine (FSM)
@@ -142,5 +127,31 @@ int main() {
         }
         break;
     }
+  }
+}
+
+void _20msISR() {
+  canTx();
+}
+
+void _3msISR() {
+  canRx();
+}
+
+void canTx() {
+  gTxMsg.len = 8;
+  gTxMsg.id = 0x222;
+  for (uint32_t i = 0; i < 8; i++) {
+    gTxMsg.buf[i] = '0' + i;
+  }
+
+  for (uint32_t i = 0; i < 6; i++) {
+    gCanBus->sendMessage(gTxMsg);
+    gTxMsg.buf[0]++;
+  }
+}
+
+void canRx() {
+  while (gCanBus->recvMessage(gRxMsg)) {
   }
 }

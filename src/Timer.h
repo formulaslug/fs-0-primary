@@ -6,7 +6,7 @@
 class Timer {
  public:
   // @param timeout expiration value in milliseconds
-  Timer(uint32_t timeout);
+  explicit Timer(uint32_t timeout);
 
   void update();
   bool isExpired();
