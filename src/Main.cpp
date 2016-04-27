@@ -1,4 +1,4 @@
-/* @desc Primary control system for the UCSC's FSAE Electric Vehicle
+/* @desc Primary control system for UCSC's FSAE Electric Vehicle
  * @dict LV = Low Voltage System, HV = High Voltage System, RTD = Ready-To-Drive
  */
 
@@ -23,10 +23,10 @@ static CAN_message_t gTxMsg;
 static CAN_message_t gRxMsg;
 
 int main() {
-  const std::array<uint8_t, NUM_LEDS> gLedPins{2, 3, 4, 5};
-  const std::array<uint8_t, NUM_BUTTONS> gButtonPins{7, 8};
+  const std::array<uint8_t, k_numLEDs> gLedPins{2, 3, 4, 5};
+  const std::array<uint8_t, k_numButtons> gButtonPins{7, 8};
 
-  constexpr uint8_t TORQUE_INPUT = A9;
+  constexpr uint8_t k_torqueInput = A9;
 
   Serial.begin(115200);
 
@@ -113,7 +113,7 @@ int main() {
       case RTD_ACTIVE:
         // Get speed
         vehicle.dynamics.torque =
-            static_cast<int>(analogRead(TORQUE_INPUT) / 2);
+            static_cast<int>(analogRead(k_torqueInput) / 2);
 
         // Show speed
         vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];

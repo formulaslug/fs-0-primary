@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <array>
 
-constexpr uint8_t NUM_LEDS = 5;
-constexpr uint8_t NUM_BUTTONS = 2;
+constexpr uint8_t k_numLEDs = 5;
+constexpr uint8_t k_numButtons = 2;
 static constexpr uint8_t ON = 1;
 static constexpr uint8_t OFF = 0;
 
@@ -54,7 +54,7 @@ class Vehicle {
   Dynamics dynamics;
 
   // LED values are 0x00 or 0xff to allow for bitwise not
-  std::array<uint8_t, NUM_LEDS> ledStates;
+  std::array<uint8_t, k_numLEDs> ledStates;
 };
 
 #endif // VEHICLE_H
