@@ -42,7 +42,7 @@ int main() {
   Vehicle vehicle;
 
   constexpr uint32_t k_ID = 0x680;
-  constexpr uint32_t k_baudRate = 500000;
+  constexpr uint32_t k_baudRate = 250000;
   gCanBus = new CANopen(k_ID, k_baudRate);
 
   IntervalTimer _20msInterrupt;
