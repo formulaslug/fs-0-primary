@@ -11,7 +11,7 @@
 #include "core_controls/CANopen.h"
 #include "Vehicle.h"
 
-void _20msISR();
+void _100msISR();
 void _3msISR();
 
 void canTx();
@@ -45,8 +45,8 @@ int main() {
   constexpr uint32_t k_baudRate = 250000;
   gCanBus = new CANopen(k_ID, k_baudRate);
 
-  IntervalTimer _20msInterrupt;
-  _20msInterrupt.begin(_20msISR, 100000);
+  IntervalTimer _100msInterrupt;
+  _100msInterrupt.begin(_100msISR, 100000);
 
   IntervalTimer _3msInterrupt;
   _3msInterrupt.begin(_3msISR, 3000);
@@ -130,7 +130,7 @@ int main() {
   }
 }
 
-void _20msISR() {
+void _100msISR() {
   canTx();
 }
 
