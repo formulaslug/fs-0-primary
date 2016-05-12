@@ -16,7 +16,8 @@ void _3msISR();
 
 void canTx();
 void canRx();
-inline void loadBuf(uint8_t * src, char * dest, uint32_t len);
+inline void printTx();
+inline void printRx();
 
 static CANopen* g_canBus = nullptr;
 static CAN_message_t g_txMsg;
@@ -56,22 +57,16 @@ int main() {
   while (1) {
     // service global flags
     if (g_msgSent) {
-      // prepare message code, output buffer
-      char buf[9] = "00000000";
-      loadBuf(g_txMsg.buf, buf, 8);
-      // print
-      Serial.print("[EVENT]: CAN message transmitted. >>");
-      Serial.println(buf);
+      cli();
+      printTx(); // g_txMsg is global..so no need to pass
+      sei();
       // clear flag
       g_msgSent = false;
     }
     if (g_msgRecv) {
-      // prepare message code, output buffer
-      char buf[9] = "00000000";
-      loadBuf(g_rxMsg.buf, buf, 8);
-      // print
-      Serial.print("[EVENT]: CAN message received. >>");
-      Serial.println(buf);
+      cli();
+      printRx(); // g_rxMsg is global..so no need to pass
+      sei();
       // clear flag
       g_msgRecv = false;
     }
@@ -166,15 +161,15 @@ void canTx() {
   static uint8_t count = 0;
   ++count;
 
-  g_txMsg.len = 8;
+  g_txMsg.len = 2; // max length message codes in bytes
   g_txMsg.id = 0x222;
 
   // write a heartbeat to the CAN bus every 1s
   if (count >= 50) {
     // define msg code
-    for (uint32_t i = 0; i < 8; ++i) {
-      // set in msg buff, the 7-ith bit of the status code
-      g_txMsg.buf[7-i] = '0' + ((k_statusHeartbeat >> i) & 0x1);
+    for (uint32_t i = 0; i < 2; ++i) {
+      // set in message buff, each byte of the message, from least to most significant
+      g_txMsg.buf[i] = (k_statusHeartbeat >> ((1-i)*8)) & 0xff;
     }
     // write to bus
     g_canBus->sendMessage(g_txMsg);
@@ -191,12 +186,24 @@ void canRx() {
   }
 }
 
-// Cleans up serial printing of can messages for 8-bit message codes
-// loads every bit of src into every char of dest for a length of len
-inline void loadBuf(uint8_t * src, char * dest, uint32_t len) {
-  cli(); // disable interrupts
-  for (uint32_t i = 0; i < len; i++) {
-    dest[i] = src[i]; // set every char in the buffer
+// prints to serial, the currently transmitted message
+inline void printTx() {
+  Serial.print("[EVENT]: CAN message transmitted. >> [ id: 0x");
+  Serial.print(g_txMsg.id, HEX); // the node's id
+  Serial.print(" , value: 0x");
+  for (uint32_t i = 0; i < g_txMsg.len; ++i) {
+    Serial.print(g_txMsg.buf[i], HEX); // the message contents
   }
-  sei(); // enable interrupts
+  Serial.println(" ]");
+}
+
+// prints to serial, the currently received message
+inline void printRx() {
+  Serial.print("[EVENT]: CAN message received.    << [ id: 0x");
+  Serial.print(g_rxMsg.id, HEX); // the node's id
+  Serial.print(" , value: 0x");
+  for (uint32_t i = 0; i < g_rxMsg.len; ++i) {
+    Serial.print(g_rxMsg.buf[i], HEX); // the message contents
+  }
+  Serial.println(" ]");
 }
