@@ -162,7 +162,7 @@ void canTx() {
   ++count;
 
   g_txMsg.len = 2; // max length message codes in bytes
-  g_txMsg.id = 0x222;
+  g_txMsg.id = 0x223;
 
   // write a heartbeat to the CAN bus every 1s
   if (count >= 50) {
