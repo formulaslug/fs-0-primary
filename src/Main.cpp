@@ -1,4 +1,5 @@
 /* @desc Primary control system for UCSC's FSAE Electric Vehicle
+ *       CAN nodeID=3
  * @dict LV = Low Voltage System, HV = High Voltage System, RTD = Ready-To-Drive
  */
 
@@ -45,7 +46,7 @@ int main() {
   constexpr uint32_t k_ID = 0x680;
   constexpr uint32_t k_baudRate = 250000;
   g_canBus = new CANopen(k_ID, k_baudRate);
-  g_txMsg.id = 0x223; // id of node on CAN bus
+  g_txMsg.id = 0x003; // id of node on CAN bus
 
   IntervalTimer _20msInterrupt;
   _20msInterrupt.begin(_20msISR, 20000);
