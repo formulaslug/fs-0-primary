@@ -59,7 +59,7 @@ int main() {
   constexpr uint32_t k_ID = 0x680;
   constexpr uint32_t k_baudRate = 250000;
   g_canBus = new CANopen(k_ID, k_baudRate);
-  g_txMsg.id = 0x003; // id of node on CAN bus
+  // g_txMsg.id = 0x003; // id of node on CAN bus
 
   intervaltimer _100msinterrupt;
   _100msinterrupt.begin(100_msISR, 20000);
@@ -216,7 +216,7 @@ void canHeartbeat() {
   // push heartbeat message to g_canTxQueue
   static uint8_t heartbeatCount = 0;
   // heartbeat message formatted with: COB-ID=0x001, len=2
-  static CAN_message_t heartbeatMsg = {cobid_statusHeartbeat,0,2,0,[0,0,0,0,0,0,0,0]};
+  static CAN_message_t heartbeatMsg = {0x003,0,2,0,[0,0,0,0,0,0,0,0]};
 
   // enqueue a heartbeat message to be written to the CAN bus every 1s, (100ms * 10 = 1s)
   if (heartbeatCount == 0) {
@@ -224,7 +224,7 @@ void canHeartbeat() {
     // populate payload (only once)
     for (uint32_t i = 0; i < 2; ++i) {
       // set in message buff, each byte of the message, from least to most significant
-      heartbeatMsg.buf[i] = (k_statusHeartbeat >> ((1 - i) * 8)) & 0xff;
+      heartbeatMsg.buf[i] = (cobid_statusHeartbeat >> ((1 - i) * 8)) & 0xff;
     }
   } else if (heartbeatCount >= 10) {
     g_canTxQueue.PushBack(heartbeatMsg);
