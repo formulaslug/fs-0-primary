@@ -10,14 +10,11 @@
 #include <stddef.h>
 
 #include <vector>
-// #include "core_controls/libs/FlexCAN.h"
 
 /**
  * This is a simple circular buffer so we don't need to "bucket brigade" copy
  * old values.
  */
-
-
 template <class T>
 class CircularBuffer {
  public:
@@ -27,8 +24,10 @@ class CircularBuffer {
   void PushBack(T value);
   T PopFront();
   T PopBack();
+  void Resize(size_t size);
   void Reset();
-  bool didEnqueue = false;
+  size_t NumElems() const;
+  size_t Size() const;
 
   T& operator[](size_t index);
   const T& operator[](size_t index) const;

@@ -194,16 +194,13 @@ void _3msISR() {
 // transmit all enqueued messages, in g_canTxQueue, of type CAN_message_t
 // enqueue them onto the transmit logs queue after so that they can be printed
 void canTx() {
-  static CAN_message_t queueMsg;
-
-  queueMsg = g_canTxQueue.PopFront();
-  while (queueMsg.id) {
+  while (g_canTxQueue.NumElems() > 0) {
     // write message
-    g_canBus->sendMessage(queueMsg);
+    g_canBus->sendMessage(g_canTxQueue[0]);
     // enqueue them onto the logs queue
-    g_canTxLogsQueue.PushBack(queueMsg);
+    g_canTxLogsQueue.PushBack(g_canTxQueue[0]);
     // dequeue new message
-    queueMsg = g_canTxQueue.PopFront();
+    g_canTxQueue.PopFront();
   }
 }
 

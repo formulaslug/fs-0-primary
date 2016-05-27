@@ -6,7 +6,6 @@
 /*----------------------------------------------------------------------------*/
 
 #include <algorithm>
-#include "core_controls/libs/FlexCAN.h"
 
 template <class T>
 CircularBuffer<T>::CircularBuffer(size_t size) : m_data(size) {}
@@ -80,6 +79,27 @@ T CircularBuffer<T>::PopBack() {
   return m_data[(m_front + m_length) % m_data.size()];
 }
 
+/**
+ * Changes size of internal buffer.
+ *
+ * All grows and shrinks are performed at the back of the circular buffer.
+ */
+template <class T>
+void CircularBuffer<T>::Resize(size_t size) {
+  if (size > m_length) {
+    while (size > m_length) {
+      PushBack(0);
+    }
+  } else if (size < m_length) {
+    while (size < m_length) {
+      PopBack();
+    }
+  }
+}
+
+/**
+ * Sets internal buffer contents to zero.
+ */
 template <class T>
 void CircularBuffer<T>::Reset() {
   std::fill(m_data.begin(), m_data.end(), 0);
@@ -88,7 +108,23 @@ void CircularBuffer<T>::Reset() {
 }
 
 /**
- * Returns element at index starting from front of buffer.
+ * @return number of elements used in internal buffer.
+ */
+template <class T>
+size_t CircularBuffer<T>::NumElems() const {
+  return m_data.size();
+}
+
+/**
+ * @return size of internal buffer.
+ */
+template <class T>
+size_t CircularBuffer<T>::Size() const {
+  return m_data.size();
+}
+
+/**
+ * @return element at index starting from front of buffer
  */
 template <class T>
 T& CircularBuffer<T>::operator[](size_t index) {
@@ -96,7 +132,7 @@ T& CircularBuffer<T>::operator[](size_t index) {
 }
 
 /**
- * Returns element at index starting from front of buffer.
+ * @return element at index starting from front of buffer
  */
 template <class T>
 const T& CircularBuffer<T>::operator[](size_t index) const {
@@ -104,7 +140,7 @@ const T& CircularBuffer<T>::operator[](size_t index) const {
 }
 
 /**
- * Increment an index modulo the length of the m_data buffer
+ * Increment an index modulo the length of the m_data buffer.
  */
 template <class T>
 size_t CircularBuffer<T>::ModuloInc(size_t index) {
@@ -112,7 +148,7 @@ size_t CircularBuffer<T>::ModuloInc(size_t index) {
 }
 
 /**
- * Decrement an index modulo the length of the m_data buffer
+ * Decrement an index modulo the length of the m_data buffer.
  */
 template <class T>
 size_t CircularBuffer<T>::ModuloDec(size_t index) {
