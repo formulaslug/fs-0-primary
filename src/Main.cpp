@@ -20,7 +20,7 @@ void _3msISR();
 void canTx();
 void canRx();
 void canHeartbeat();
-void updateThrottleTPDO(uint16_t throttleVoltage);
+void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch);
 
 static CANopen* g_canBus = nullptr;
 // when messages are enqueued to g_canTxQueue, they are printed over serial
@@ -178,7 +178,7 @@ void _100msISR() {
   // enqueue heartbeat message to g_canTxQueue
   canHeartbeat();
   // enqueue throttle voltage periodically as well
-  updateThrottleTPDO(0x55);
+  updateThrottleTPDO(0x55, 1);
 }
 
 void _20msISR() {
@@ -237,14 +237,21 @@ void canHeartbeat() {
 }
 
 // From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
-void updateThrottleTPDO(uint16_t throttleVoltage) {
+/**
+ * @param throttleVoltage The current, cleaned throttle voltage to be sent to Master
+ * @param forwardSwitch A boolean corresponding to moving forward (must be 1 bit)
+ */
+void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
   // throttle message formate with: COB-ID=0x241, len=7
   // static uint8_t throttleMsgPayload[8] = {0,0,0,0,0,0,0,0};
   static CAN_message_t throttleMsg = {cobid_TPDO5,0,7,0,{0,0,0,0,0,0,0,0}};
 
   // insert new throttle voltage value
-  throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB byte
-  throttleMsg.buf[1] = (throttleVoltage) & 0xff; // LSB byte
+  throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB
+  throttleMsg.buf[1] = (throttleVoltage) & 0xff; // LSB
+
+  // insert new forward switch value
+  throttleMsg.buf[6] = (forwardSwitch & 0x1) << 7; // sets byte as: on=0x80, off=0x00
 
   // enqueue the new value to be written to CAN bus
   g_canTxQueue.PushBack(throttleMsg);
