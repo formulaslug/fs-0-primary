@@ -80,7 +80,7 @@ int main() {
     CAN_message_t queueMsg;
     // print all received messages
     queueMsg = g_canRxQueue.PopFront();
-    while (queueMsg) {
+    while (queueMsg.id) {
       // print
       g_canBus->printRx(queueMsg);
       // dequeue another message
@@ -88,7 +88,7 @@ int main() {
     }
     // print all sent messages
     queueMsg = g_canTxLogsQueue.PopFront();
-    while (queueMsg) {
+    while (queueMsg.id) {
       // print
       g_canBus->printTx(queueMsg);
       // dequeue another message
@@ -195,7 +195,7 @@ void canTx() {
   static CAN_message_t queueMsg;
 
   queueMsg = g_canTxQueue.PopFront();
-  while (queueMsg) {
+  while (queueMsg.id) {
     // write message
     g_canBus->sendMessage(queueMsg);
     // enqueue them onto the logs queue
@@ -217,8 +217,10 @@ void canRx() {
 void canHeartbeat() {
   // push heartbeat message to g_canTxQueue
   static uint8_t heartbeatCount = 0;
+  // static uint8_t heartbeatMsgPayload[8] = {0,0,0,0,0,0,0,0};
   // heartbeat message formatted with: COB-ID=0x001, len=2
-  static CAN_message_t heartbeatMsg = {0x003,0,2,0,[0,0,0,0,0,0,0,0]};
+  static CAN_message_t heartbeatMsg = {cobid_node3Heartbeat,0,2,0,{0,0,0,0,0,0,0,0}};
+  // static CAN_message_t heartbeatMsg = {0x003,0,2,0,heartbeatMsgPayload};
 
   // enqueue a heartbeat message to be written to the CAN bus every 1s, (100ms * 10 = 1s)
   if (heartbeatCount == 0) {
@@ -226,7 +228,7 @@ void canHeartbeat() {
     // populate payload (only once)
     for (uint32_t i = 0; i < 2; ++i) {
       // set in message buff, each byte of the message, from least to most significant
-      heartbeatMsg.buf[i] = (cobid_statusHeartbeat >> ((1 - i) * 8)) & 0xff;
+      heartbeatMsg.buf[i] = (payload_heartbeat >> ((1 - i) * 8)) & 0xff;
     }
   } else if (heartbeatCount >= 10) {
     g_canTxQueue.PushBack(heartbeatMsg);
@@ -238,12 +240,13 @@ void canHeartbeat() {
 // From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
 void updateThrottleTPDO(uint16_t throttleVoltage) {
   // throttle message formate with: COB-ID=0x241, len=7
-  static CAN_message_t throttleMsg = {cobid_TPDO5,0,7,0,[0,0,0,0,0,0,0,0]};
+  // static uint8_t throttleMsgPayload[8] = {0,0,0,0,0,0,0,0};
+  static CAN_message_t throttleMsg = {cobid_TPDO5,0,7,0,{0,0,0,0,0,0,0,0}};
 
   // insert new throttle voltage value
   throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB byte
   throttleMsg.buf[1] = (throttleVoltage) & 0xff; // LSB byte
 
   // enqueue the new value to be written to CAN bus
-  g_canTxQueue.pushBack(throttleVoltage);
+  g_canTxQueue.PushBack(throttleMsg);
 }
