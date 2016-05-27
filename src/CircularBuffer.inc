@@ -6,9 +6,10 @@
 /*----------------------------------------------------------------------------*/
 
 #include <algorithm>
+#include "core_controls/libs/FlexCAN.h"
 
 template <class T>
-CircularBuffer<T>::CircularBuffer(size_t size) : m_data(size, 0) {}
+CircularBuffer<T>::CircularBuffer(size_t size) : m_data(size) {}
 
 /**
  * Push new value onto front of the buffer. The value at the back is overwritten
@@ -47,24 +48,44 @@ void CircularBuffer<T>::PushBack(T value) {
     // Increment front if buffer is full to maintain size
     m_front = ModuloInc(m_front);
   }
-  didEnqueue = true;
 }
 
 /**
- * Pop value at front of buffer.
- */
-template <class T>
-T CircularBuffer<T>::PopFront() {
-  // If there are no elements in the buffer, do nothing
-  if (m_length == 0) {
-    return 0;
-  }
+  * Pop value at front of buffer (special case for CAN_message_t)
+*/
+template <class CAN_message_t>
+CAN_message_t CircularBuffer<CAN_message_t>::PopFront() {
+    // If there are no elements in the buffer, do nothing
+    if (m_length == 0) {
+      CAN_message_t empty;
+      empty.id = 0;
+      return empty;
+    }
 
-  T& temp = m_data[m_front];
-  m_front = ModuloInc(m_front);
-  m_length--;
-  return temp;
+    auto& temp = m_data[m_front];
+    m_front = ModuloInc(m_front);
+    m_length--;
+    return temp;
 }
+
+// Definition conflicts with the one above, how to I both specify the general template
+// version AND the CAN_message_t specific version?
+
+// /**
+//  * Pop value at front of buffer.
+//  */
+// template <class T>
+// T CircularBuffer<T>::PopFront() {
+//   // If there are no elements in the buffer, do nothing
+//   if (m_length == 0) {
+//     return 0;
+//   }
+//
+//   T& temp = m_data[m_front];
+//   m_front = ModuloInc(m_front);
+//   m_length--;
+//   return temp;
+// }
 
 /**
  * Pop value at back of buffer.
