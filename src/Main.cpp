@@ -19,6 +19,8 @@ void _3msISR();
 
 void canTx();
 void canRx();
+void canHeartbeat();
+void updateThrottleTPDO(uint16_t throttleVoltage);
 
 static CANopen* g_canBus = nullptr;
 // when messages are enqueued to g_canTxQueue, they are printed over serial
@@ -46,11 +48,11 @@ int main() {
   Serial.begin(115200);
 
   // Init LEDs
-  for (auto& ledPin : gLedPins) {
+  for (auto& ledPin : g_LedPins) {
     pinMode(ledPin, HIGH);
   }
   // Init buttons
-  for (auto& buttonPin : gButtonPins) {
+  for (auto& buttonPin : g_ButtonPins) {
     pinMode(buttonPin, INPUT);
   }
 
@@ -61,10 +63,10 @@ int main() {
   g_canBus = new CANopen(k_ID, k_baudRate);
   // g_txMsg.id = 0x003; // id of node on CAN bus
 
-  intervaltimer _100msinterrupt;
-  _100msinterrupt.begin(100_msISR, 20000);
+  IntervalTimer _100msinterrupt;
+  _100msinterrupt.begin(_100msISR, 100000);
 
-  intervaltimer _20msinterrupt;
+  IntervalTimer _20msinterrupt;
   _20msinterrupt.begin(_20msISR, 20000);
 
   IntervalTimer _3msInterrupt;
@@ -108,7 +110,7 @@ int main() {
         vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to HV_STARTUP
-        if (digitalReadFast(gButtonPins[HV_TOGGLE]) == LOW) {
+        if (digitalReadFast(g_ButtonPins[HV_TOGGLE]) == LOW) {
           vehicle.state = HV_STARTUP;
         }
         break;
@@ -130,9 +132,9 @@ int main() {
         vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to RTD_STARTUP until user input
-        if (digitalReadFast(gButtonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(g_ButtonPins[RTD_TOGGLE]) == LOW) {
           vehicle.state = RTD_STARTUP;
-        } else if (digitalReadFast(gButtonPins[HV_TOGGLE]) == LOW) {
+        } else if (digitalReadFast(g_ButtonPins[HV_TOGGLE]) == LOW) {
           // Or move back to LV active
           vehicle.state = HV_SHUTDOWN;
         }
@@ -161,7 +163,7 @@ int main() {
         vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];
 
         // Wait to transition back
-        if (digitalReadFast(gButtonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(g_ButtonPins[RTD_TOGGLE]) == LOW) {
           // Start moving back to HV_ACTIVE
           vehicle.ledStates[SPEED] = LED_OFF;
           vehicle.dynamics.torque = 50;
