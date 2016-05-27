@@ -11,7 +11,9 @@
 #include <IntervalTimer.h>
 #include "core_controls/CANopen.h"
 #include "Vehicle.h"
+#include "CircularBuffer.h"
 
+void _100msISR();
 void _20msISR();
 void _3msISR();
 
@@ -19,14 +21,25 @@ void canTx();
 void canRx();
 
 static CANopen* g_canBus = nullptr;
-static CAN_message_t g_txMsg;
-static CAN_message_t g_rxMsg;
-static bool g_msgSent = false; // flag s.t. true=[message recently sent over can bus]
-static bool g_msgRecv = false; // flag s.t. true=[message recently received over can bus]
+// when messages are enqueued to g_canTxQueue, they are printed over serial
+static CircularBuffer<CAN_message_t> g_canTxQueue(10);
+static CircularBuffer<CAN_message_t> g_canTxLogsQueue(10);
+// when messages are dequeued from g_canRxQueue, they are printed over serial
+static CircularBuffer<CAN_message_t> g_canRxQueue(10);
+
+// TODO: refactor so that
+//  - there is a standardized way of dealing with received packets outside of ISRs (print, etc.)
+//  - there is some way to print transmited packets without losing them from being
+//    removed from queue
+//  - a brute force method is to make a g_canTxLogsQueue that has items enqueued to it after
+//    they have been successfully transmited over CAN
+//
+//  ^ implemented it
+
 
 int main() {
-  const std::array<uint8_t, k_numLEDs> gLedPins{2, 3, 4, 5};
-  const std::array<uint8_t, k_numButtons> gButtonPins{7, 8};
+  const std::array<uint8_t, k_numLEDs> g_LedPins{2, 3, 4, 5};
+  const std::array<uint8_t, k_numButtons> g_ButtonPins{7, 8};
 
   constexpr uint8_t k_torqueInput = A9;
 
@@ -48,8 +61,11 @@ int main() {
   g_canBus = new CANopen(k_ID, k_baudRate);
   g_txMsg.id = 0x003; // id of node on CAN bus
 
-  IntervalTimer _20msInterrupt;
-  _20msInterrupt.begin(_20msISR, 20000);
+  intervaltimer _100msinterrupt;
+  _100msinterrupt.begin(100_msISR, 20000);
+
+  intervaltimer _20msinterrupt;
+  _20msinterrupt.begin(_20msISR, 20000);
 
   IntervalTimer _3msInterrupt;
   _3msInterrupt.begin(_3msISR, 3000);
@@ -57,17 +73,24 @@ int main() {
   while (1) {
     // Service global flags
     cli();
-    if (g_msgSent) {
-      g_canBus->printTx(g_txMsg);
 
-      // Clear flag
-      g_msgSent = false;
+    // temporarily ugly
+    CAN_message_t queueMsg;
+    // print all received messages
+    queueMsg = g_canRxQueue.PopFront();
+    while (queueMsg) {
+      // print
+      g_canBus->printRx(queueMsg);
+      // dequeue another message
+      queueMsg = g_canRxQueue.PopFront();
     }
-    if (g_msgRecv) {
-      g_canBus->printRx(g_rxMsg);
-
-      // Clear flag
-      g_msgRecv = false;
+    // print all sent messages
+    queueMsg = g_canTxLogsQueue.PopFront();
+    while (queueMsg) {
+      // print
+      g_canBus->printTx(queueMsg);
+      // dequeue another message
+      queueMsg = g_canTxLogsQueue.PopFront();
     }
     sei();
 
@@ -149,39 +172,76 @@ int main() {
   }
 }
 
+void _100msISR() {
+  // enqueue heartbeat message to g_canTxQueue
+  canHeartbeat();
+}
+
 void _20msISR() {
+  // dequeue and transmit all messages in g_canTxQueue
   canTx();
 }
 
 void _3msISR() {
+  // enqueue to g_canRxQueue, any received messages
   canRx();
 }
 
+// transmit all enqueued messages, in g_canTxQueue, of type CAN_message_t
+// enqueue them onto the transmit logs queue after so that they can be printed
 void canTx() {
-  static uint8_t heartbeatCount = 0;
-  ++heartbeatCount;
+  static CAN_message_t queueMsg;
 
-  g_txMsg.len = 2; // max length message codes in bytes
-
-  // write a heartbeat to the CAN bus every 1s, (20ms * 50 = 1s)
-  if (heartbeatCount >= 50) {
-    // define msg code
-    for (uint32_t i = 0; i < 2; ++i) {
-      // set in message buff, each byte of the message, from least to most significant
-      g_txMsg.buf[i] = (k_statusHeartbeat >> ((1 - i) * 8)) & 0xff;
-    }
-    // write to bus
-    g_canBus->sendMessage(g_txMsg);
-    // reset count
-    heartbeatCount = 0;
-    // set flag
-    g_msgSent = true;
+  queueMsg = g_canTxQueue.PopFront();
+  while (queueMsg) {
+    // write message
+    g_canBus->sendMessage(queueMsg);
+    // enqueue them onto the logs queue
+    g_canTxLogsQueue.PushBack(queueMsg);
+    // dequeue new message
+    queueMsg = g_canTxQueue.PopFront();
   }
 }
 
+// enqueue any messages apearing on the CAN bus
 void canRx() {
-  while (g_canBus->recvMessage(g_rxMsg)) {
-    // set flag
-    g_msgRecv = true;
+  static CAN_message_t rxMsgTmp;
+  while (g_canBus->recvMessage(rxMsgTmp)) {
+    g_canRxQueue.PushBack(rxMsgTmp);
   }
+}
+
+// Writes the node's heartbeat to the CAN bus every 1s
+void canHeartbeat() {
+  // push heartbeat message to g_canTxQueue
+  static uint8_t heartbeatCount = 0;
+  // heartbeat message formatted with: COB-ID=0x001, len=2
+  static CAN_message_t heartbeatMsg = {cobid_statusHeartbeat,0,2,0,[0,0,0,0,0,0,0,0]};
+
+  // enqueue a heartbeat message to be written to the CAN bus every 1s, (100ms * 10 = 1s)
+  if (heartbeatCount == 0) {
+    // TODO: add this statically into the initialization of heartbeatMsg
+    // populate payload (only once)
+    for (uint32_t i = 0; i < 2; ++i) {
+      // set in message buff, each byte of the message, from least to most significant
+      heartbeatMsg.buf[i] = (k_statusHeartbeat >> ((1 - i) * 8)) & 0xff;
+    }
+  } else if (heartbeatCount >= 10) {
+    g_canTxQueue.PushBack(heartbeatMsg);
+    heartbeatCount = 1;
+  }
+  ++heartbeatCount;
+}
+
+// From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
+void updateThrottleTPDO(uint16_t throttleVoltage) {
+  // throttle message formate with: COB-ID=0x241, len=7
+  static CAN_message_t throttleMsg = {cobid_TPDO5,0,7,0,[0,0,0,0,0,0,0,0]};
+
+  // insert new throttle voltage value
+  throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB byte
+  throttleMsg.buf[1] = (throttleVoltage) & 0xff; // LSB byte
+
+  // enqueue the new value to be written to CAN bus
+  g_canTxQueue.pushBack(throttleVoltage);
 }
