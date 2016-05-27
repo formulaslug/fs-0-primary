@@ -177,6 +177,8 @@ int main() {
 void _100msISR() {
   // enqueue heartbeat message to g_canTxQueue
   canHeartbeat();
+  // enqueue throttle voltage periodically as well
+  updateThrottleTPDO(0x55);
 }
 
 void _20msISR() {
