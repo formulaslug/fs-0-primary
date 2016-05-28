@@ -112,7 +112,7 @@ void CircularBuffer<T>::Reset() {
  */
 template <class T>
 size_t CircularBuffer<T>::NumElems() const {
-  return m_data.size();
+  return m_length;
 }
 
 /**
