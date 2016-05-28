@@ -39,6 +39,10 @@ enum Buttons {
   RTD_TOGGLE
 };
 
+enum DigitalInputs {
+  THROTTLE_VOLTAGE
+};
+
 class Vehicle {
  public:
   Vehicle();
@@ -46,7 +50,7 @@ class Vehicle {
   uint8_t state = LV_STARTUP;
 
   struct Dynamics {
-    uint16_t torque = 10;
+    uint16_t throttleVoltage = 1;
     uint16_t speed;
     uint8_t topSpeed = 60;
   };

@@ -29,34 +29,23 @@ static CircularBuffer<CAN_message_t> g_canTxLogsQueue(10);
 // when messages are dequeued from g_canRxQueue, they are printed over serial
 static CircularBuffer<CAN_message_t> g_canRxQueue(10);
 
-// TODO: refactor so that
-//  - there is a standardized way of dealing with received packets outside of ISRs (print, etc.)
-//  - there is some way to print transmited packets without losing them from being
-//    removed from queue
-//  - a brute force method is to make a g_canTxLogsQueue that has items enqueued to it after
-//    they have been successfully transmited over CAN
-//
-//  ^ implemented it
-
+// global vehicle so that properties can be accessed from within ISRs
+static Vehicle g_vehicle;
 
 int main() {
-  const std::array<uint8_t, k_numLEDs> g_LedPins{2, 3, 4, 5};
-  const std::array<uint8_t, k_numButtons> g_ButtonPins{7, 8};
-
-  constexpr uint8_t k_torqueInput = A9;
+  const std::array<uint8_t, k_numButtons> buttonPins{7, 8};
+  // const std::array<uint8_t, 1> digitalInputPins{9};
 
   Serial.begin(115200);
 
-  // Init LEDs
-  for (auto& ledPin : g_LedPins) {
-    pinMode(ledPin, HIGH);
-  }
   // Init buttons
-  for (auto& buttonPin : g_ButtonPins) {
+  for (auto& buttonPin : buttonPins) {
     pinMode(buttonPin, INPUT);
   }
-
-  Vehicle vehicle;
+  // Init digital inputs (ADC)
+  // for (auto& inputPin : digitalInputPins) {
+  //   pinMode(inputPin, INPUT);
+  // }
 
   constexpr uint32_t k_ID = 0x680;
   constexpr uint32_t k_baudRate = 250000;
@@ -96,103 +85,115 @@ int main() {
     }
     sei();
 
+    // Update all digital inputs
+
     // Vehicle's main state machine (FSM)
-    switch (vehicle.state) {
+    switch (g_vehicle.state) {
       case LV_STARTUP:
         // Perform LV_STARTUP functions HERE
-
-        vehicle.state = LV_ACTIVE;
+        g_vehicle.state = LV_ACTIVE;
         break;
       case LV_ACTIVE:
         // Set LED feedback
-        vehicle.ledStates[BLUE] = LED_ON;
-        vehicle.ledStates[YELLOW] = LED_OFF;
-        vehicle.ledStates[RED] = LED_OFF;
+        g_vehicle.ledStates[BLUE] = LED_ON;
+        g_vehicle.ledStates[YELLOW] = LED_OFF;
+        g_vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to HV_STARTUP
-        if (digitalReadFast(g_ButtonPins[HV_TOGGLE]) == LOW) {
-          vehicle.state = HV_STARTUP;
+        if (digitalReadFast(buttonPins[HV_TOGGLE]) == LOW) {
+          g_vehicle.state = HV_STARTUP;
         }
         break;
       case HV_SHUTDOWN:
         // Perform HV_SHUTDOWN functions HERE
 
         // Transition to LV_ACTIVE
-        vehicle.state = LV_ACTIVE;
+        g_vehicle.state = LV_ACTIVE;
         break;
       case HV_STARTUP:
         // Perform LV_STARTUP functions HERE
 
-        vehicle.state = HV_ACTIVE;
+        g_vehicle.state = HV_ACTIVE;
         break;
       case HV_ACTIVE:
         // Set LED feedback
-        vehicle.ledStates[BLUE] = LED_ON;
-        vehicle.ledStates[YELLOW] = LED_ON;
-        vehicle.ledStates[RED] = LED_OFF;
+        g_vehicle.ledStates[BLUE] = LED_ON;
+        g_vehicle.ledStates[YELLOW] = LED_ON;
+        g_vehicle.ledStates[RED] = LED_OFF;
 
         // Wait to move to RTD_STARTUP until user input
-        if (digitalReadFast(g_ButtonPins[RTD_TOGGLE]) == LOW) {
-          vehicle.state = RTD_STARTUP;
-        } else if (digitalReadFast(g_ButtonPins[HV_TOGGLE]) == LOW) {
+        if (digitalReadFast(buttonPins[RTD_TOGGLE]) == LOW) {
+          g_vehicle.state = RTD_STARTUP;
+        } else if (digitalReadFast(buttonPins[HV_TOGGLE]) == LOW) {
           // Or move back to LV active
-          vehicle.state = HV_SHUTDOWN;
+          g_vehicle.state = HV_SHUTDOWN;
         }
         break;
       case RTD_SHUTDOWN:
         // Perform HV_SHUTDOWN functions HERE
 
-        vehicle.state = HV_ACTIVE;
+        g_vehicle.state = HV_ACTIVE;
         break;
       case RTD_STARTUP:
         // Perform LV_STARTUP functions HERE
 
         // Show entire system is hot
-        vehicle.ledStates[BLUE] = LED_ON;
-        vehicle.ledStates[YELLOW] = LED_ON;
-        vehicle.ledStates[RED] = LED_ON;
+        g_vehicle.ledStates[BLUE] = LED_ON;
+        g_vehicle.ledStates[YELLOW] = LED_ON;
+        g_vehicle.ledStates[RED] = LED_ON;
 
-        vehicle.state = RTD_ACTIVE;
+        g_vehicle.state = RTD_ACTIVE;
         break;
       case RTD_ACTIVE:
-        // Get speed
-        vehicle.dynamics.torque =
-            static_cast<int>(analogRead(k_torqueInput) / 2);
+        // update current throttle voltage
+        // g_vehicle.dynamics.throttleVoltage =
+            // digitalReadFast(digitalInputPins[THROTTLE_VOLTAGE]);
+            // static_cast<int>(digitalReadFast(digitalInputPins[THROTTLE_VOLTAGE]));
 
         // Show speed
-        vehicle.ledStates[SPEED] = ~vehicle.ledStates[SPEED];
+        g_vehicle.ledStates[SPEED] = ~g_vehicle.ledStates[SPEED];
 
         // Wait to transition back
-        if (digitalReadFast(g_ButtonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(buttonPins[RTD_TOGGLE]) == LOW) {
           // Start moving back to HV_ACTIVE
-          vehicle.ledStates[SPEED] = LED_OFF;
-          vehicle.dynamics.torque = 50;
-          vehicle.state = RTD_SHUTDOWN;
+          g_vehicle.ledStates[SPEED] = LED_OFF;
+          g_vehicle.dynamics.throttleVoltage = 1;
+          g_vehicle.state = RTD_SHUTDOWN;
         }
         break;
     }
   }
 }
 
+/**
+ * @desc Performs all periodic, low frequency tasks
+ */
 void _100msISR() {
   // enqueue heartbeat message to g_canTxQueue
   canHeartbeat();
   // enqueue throttle voltage periodically as well
   updateThrottleTPDO(0x55, 1);
+  // g_vehicle.dynamics.throttleVoltage
 }
 
+/**
+ * @desc Processes and transmits all messages in g_canTxQueue
+ */
 void _20msISR() {
-  // dequeue and transmit all messages in g_canTxQueue
   canTx();
 }
 
+/**
+ * @desc Processes all received CAN messages into g_canRxQueue
+ */
 void _3msISR() {
-  // enqueue to g_canRxQueue, any received messages
   canRx();
 }
 
-// transmit all enqueued messages, in g_canTxQueue, of type CAN_message_t
-// enqueue them onto the transmit logs queue after so that they can be printed
+/**
+ * @desc Transmits all enqueued messages, in g_canTxQueue, of type CAN_message_t. Enqueue
+ *       them onto the transmit logs queue after so that they can be printed
+ */
 void canTx() {
   while (g_canTxQueue.NumElems() > 0) {
     // write message
@@ -204,7 +205,9 @@ void canTx() {
   }
 }
 
-// enqueue any messages apearing on the CAN bus
+/**
+ * @desc Enqueue any messages apearing on the CAN bus
+ */
 void canRx() {
   static CAN_message_t rxMsgTmp;
   while (g_canBus->recvMessage(rxMsgTmp)) {
@@ -212,13 +215,18 @@ void canRx() {
   }
 }
 
-// Writes the node's heartbeat to the CAN bus every 1s
+/**
+ * @desc Writes the node's heartbeat to the CAN bus every 1s
+ */
 void canHeartbeat() {
   // push heartbeat message to g_canTxQueue
   static uint8_t heartbeatCount = 0;
   // static uint8_t heartbeatMsgPayload[8] = {0,0,0,0,0,0,0,0};
   // heartbeat message formatted with: COB-ID=0x001, len=2
-  static CAN_message_t heartbeatMsg = {cobid_node3Heartbeat,0,2,0,{0,0,0,0,0,0,0,0}};
+  static CAN_message_t heartbeatMsg = {
+    cobid_node3Heartbeat, 0, 2, 0,
+    {0, 0, 0, 0, 0, 0, 0, 0}
+  };
   // static CAN_message_t heartbeatMsg = {0x003,0,2,0,heartbeatMsgPayload};
 
   // enqueue a heartbeat message to be written to the CAN bus every 1s, (100ms * 10 = 1s)
@@ -236,8 +244,8 @@ void canHeartbeat() {
   ++heartbeatCount;
 }
 
-// From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
 /**
+ * @desc From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
  * @param throttleVoltage The current, cleaned throttle voltage to be sent to Master
  * @param forwardSwitch A boolean corresponding to moving forward (must be 1 bit)
  */
