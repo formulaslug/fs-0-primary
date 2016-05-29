@@ -39,7 +39,7 @@ enum Buttons {
   RTD_TOGGLE
 };
 
-enum DigitalInputs {
+enum AnalogInputs {
   THROTTLE_VOLTAGE
 };
 

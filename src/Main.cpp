@@ -34,7 +34,7 @@ static Vehicle g_vehicle;
 
 int main() {
   const std::array<uint8_t, k_numButtons> buttonPins{7, 8};
-  // const std::array<uint8_t, 1> digitalInputPins{9};
+  const std::array<uint8_t, 1> analogInputPins{9};
 
   Serial.begin(115200);
 
@@ -43,9 +43,9 @@ int main() {
     pinMode(buttonPin, INPUT);
   }
   // Init digital inputs (ADC)
-  // for (auto& inputPin : digitalInputPins) {
-  //   pinMode(inputPin, INPUT);
-  // }
+  for (auto& inputPin : analogInputPins) {
+    pinMode(inputPin, INPUT);
+  }
 
   constexpr uint32_t k_ID = 0x680;
   constexpr uint32_t k_baudRate = 250000;
@@ -85,7 +85,9 @@ int main() {
     }
     sei();
 
-    // Update all digital inputs
+    // (TEMPORARY) Update all analog inputs readings. In production, this will go in the fsm
+    // TODO: clean this input and give a leeway of 3 or 4 before setting the new value
+    g_vehicle.dynamics.throttleVoltage = analogRead(analogInputPins[THROTTLE_VOLTAGE]);
 
     // Vehicle's main state machine (FSM)
     switch (g_vehicle.state) {
@@ -146,9 +148,7 @@ int main() {
         break;
       case RTD_ACTIVE:
         // update current throttle voltage
-        // g_vehicle.dynamics.throttleVoltage =
-            // digitalReadFast(digitalInputPins[THROTTLE_VOLTAGE]);
-            // static_cast<int>(digitalReadFast(digitalInputPins[THROTTLE_VOLTAGE]));
+        g_vehicle.dynamics.throttleVoltage = analogRead(analogInputPins[THROTTLE_VOLTAGE]);
 
         // Show speed
         g_vehicle.ledStates[SPEED] = ~g_vehicle.ledStates[SPEED];
@@ -172,8 +172,7 @@ void _100msISR() {
   // enqueue heartbeat message to g_canTxQueue
   canHeartbeat();
   // enqueue throttle voltage periodically as well
-  updateThrottleTPDO(0x55, 1);
-  // g_vehicle.dynamics.throttleVoltage
+  updateThrottleTPDO(g_vehicle.dynamics.throttleVoltage, 1);
 }
 
 /**
@@ -224,8 +223,7 @@ void canHeartbeat() {
   // static uint8_t heartbeatMsgPayload[8] = {0,0,0,0,0,0,0,0};
   // heartbeat message formatted with: COB-ID=0x001, len=2
   static CAN_message_t heartbeatMsg = {
-    cobid_node3Heartbeat, 0, 2, 0,
-    {0, 0, 0, 0, 0, 0, 0, 0}
+    cobid_node3Heartbeat, 0, 2, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
   // static CAN_message_t heartbeatMsg = {0x003,0,2,0,heartbeatMsgPayload};
 
@@ -245,6 +243,12 @@ void canHeartbeat() {
 }
 
 /**
+ * @desc Writes (queues) all teensy<->teensy specific information to the CAN bus
+ */
+void canTeensy2Teensy() {
+}
+
+/**
  * @desc From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
  * @param throttleVoltage The current, cleaned throttle voltage to be sent to Master
  * @param forwardSwitch A boolean corresponding to moving forward (must be 1 bit)
@@ -252,7 +256,9 @@ void canHeartbeat() {
 void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
   // throttle message formate with: COB-ID=0x241, len=7
   // static uint8_t throttleMsgPayload[8] = {0,0,0,0,0,0,0,0};
-  static CAN_message_t throttleMsg = {cobid_TPDO5,0,7,0,{0,0,0,0,0,0,0,0}};
+  static CAN_message_t throttleMsg = {
+    cobid_TPDO5, 0, 7, 0, {0, 0, 0, 0, 0, 0, 0, 0}
+  };
 
   // insert new throttle voltage value
   throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB
