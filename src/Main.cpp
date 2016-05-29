@@ -11,24 +11,20 @@
 #include <IntervalTimer.h>
 #include "core_controls/CANopen.h"
 #include "Vehicle.h"
-#include "CircularBuffer.h"
 
+// timer interrupt handlers
+void _1sISR();
 void _100msISR();
 void _20msISR();
 void _3msISR();
 
-void canTx();
-void canRx();
-void canHeartbeat();
-void canPrimary2Secondary();
-void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch);
+// declarations of the can message packing functions
+CAN_message_t canGetHeartbeat();
+CAN_message_t canGetThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch);
+CAN_message_t canGetPrimary2Secondary();
 
+// contains and controls all CAN related functions
 static CANopen* g_canBus = nullptr;
-// when messages are enqueued to g_canTxQueue, they are printed over serial
-static CircularBuffer<CAN_message_t> g_canTxQueue(10);
-static CircularBuffer<CAN_message_t> g_canTxLogsQueue(10);
-// when messages are dequeued from g_canRxQueue, they are printed over serial
-static CircularBuffer<CAN_message_t> g_canRxQueue(10);
 
 // global vehicle so that properties can be accessed from within ISRs
 static Vehicle g_vehicle;
@@ -51,39 +47,25 @@ int main() {
   constexpr uint32_t k_ID = 0x680;
   constexpr uint32_t k_baudRate = 250000;
   g_canBus = new CANopen(k_ID, k_baudRate);
-  // g_txMsg.id = 0x003; // id of node on CAN bus
 
-  IntervalTimer _100msinterrupt;
-  _100msinterrupt.begin(_100msISR, 100000);
+  IntervalTimer _1sInterrupt;
+  _1sInterrupt.begin(_1sISR, 1000000);
 
-  IntervalTimer _20msinterrupt;
-  _20msinterrupt.begin(_20msISR, 20000);
+  IntervalTimer _100msInterrupt;
+  _100msInterrupt.begin(_100msISR, 100000);
+
+  IntervalTimer _20msInterrupt;
+  _20msInterrupt.begin(_20msISR, 20000);
 
   IntervalTimer _3msInterrupt;
   _3msInterrupt.begin(_3msISR, 3000);
 
   while (1) {
-    // Service global flags
     cli();
-
-    // temporarily ugly
-    CAN_message_t queueMsg;
+    // print all transmitted messages
+    g_canBus->printTxAll();
     // print all received messages
-    queueMsg = g_canRxQueue.PopFront();
-    while (queueMsg.id) {
-      // print
-      g_canBus->printRx(queueMsg);
-      // dequeue another message
-      queueMsg = g_canRxQueue.PopFront();
-    }
-    // print all sent messages
-    queueMsg = g_canTxLogsQueue.PopFront();
-    while (queueMsg.id) {
-      // print
-      g_canBus->printTx(queueMsg);
-      // dequeue another message
-      queueMsg = g_canTxLogsQueue.PopFront();
-    }
+    g_canBus->printRxAll();
     sei();
 
     // (TEMPORARY) Update all analog inputs readings. In production, this will go in the fsm
@@ -167,90 +149,69 @@ int main() {
 }
 
 /**
- * @desc Performs all periodic, low frequency tasks
+ * @desc Performs period tasks every second
+ */
+void _1sISR() {
+  // enqueue heartbeat message to g_canTxQueue
+  g_canBus->queueTx(canGetHeartbeat());
+}
+
+/**
+ * @desc Performs periodic tasks every 1/10 second
  */
 void _100msISR() {
-  // enqueue heartbeat message to g_canTxQueue
-  canHeartbeat();
   // enqueue throttle voltage periodically as well
-  updateThrottleTPDO(g_vehicle.dynamics.throttleVoltage, 1);
+  g_canBus->queueTx(canGetThrottleTPDO(g_vehicle.dynamics.throttleVoltage, 1));
   // enqueue primary-to-secondary message
-  canPrimary2Secondary();
+  g_canBus->queueTx(canGetPrimary2Secondary());
 }
 
 /**
  * @desc Processes and transmits all messages in g_canTxQueue
  */
 void _20msISR() {
-  canTx();
+  g_canBus->processTx();
 }
 
 /**
  * @desc Processes all received CAN messages into g_canRxQueue
  */
 void _3msISR() {
-  canRx();
-}
-
-/**
- * @desc Transmits all enqueued messages, in g_canTxQueue, of type CAN_message_t. Enqueue
- *       them onto the transmit logs queue after so that they can be printed
- */
-void canTx() {
-  while (g_canTxQueue.NumElems() > 0) {
-    // write message
-    g_canBus->sendMessage(g_canTxQueue[0]);
-    // enqueue them onto the logs queue
-    g_canTxLogsQueue.PushBack(g_canTxQueue[0]);
-    // dequeue new message
-    g_canTxQueue.PopFront();
-  }
-}
-
-/**
- * @desc Enqueue any messages apearing on the CAN bus
- */
-void canRx() {
-  static CAN_message_t rxMsgTmp;
-  while (g_canBus->recvMessage(rxMsgTmp)) {
-    g_canRxQueue.PushBack(rxMsgTmp);
-  }
+  g_canBus->processRx();
 }
 
 /**
  * @desc Writes the node's heartbeat to the CAN bus every 1s
+ * @return The packaged message of type CAN_message_t
  */
-void canHeartbeat() {
-  // push heartbeat message to g_canTxQueue
-  static uint8_t heartbeatCount = 0;
-  // static uint8_t heartbeatMsgPayload[8] = {0,0,0,0,0,0,0,0};
+CAN_message_t canGetHeartbeat() {
+  static bool didInit = false;
   // heartbeat message formatted with: COB-ID=0x001, len=2
   static CAN_message_t heartbeatMsg = {
     cobid_node3Heartbeat, 0, 2, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
-  // static CAN_message_t heartbeatMsg = {0x003,0,2,0,heartbeatMsgPayload};
 
-  // enqueue a heartbeat message to be written to the CAN bus every 1s, (100ms * 10 = 1s)
-  if (heartbeatCount == 0) {
+  // insert the heartbeat payload on the first call
+  if (!didInit) {
     // TODO: add this statically into the initialization of heartbeatMsg
     // populate payload (only once)
     for (uint32_t i = 0; i < 2; ++i) {
       // set in message buff, each byte of the message, from least to most significant
       heartbeatMsg.buf[i] = (payload_heartbeat >> ((1 - i) * 8)) & 0xff;
     }
-  } else if (heartbeatCount >= 10) {
-    g_canTxQueue.PushBack(heartbeatMsg);
-    heartbeatCount = 1;
+    didInit = true;
   }
-  ++heartbeatCount;
+  // return the packed/formatted message
+  return heartbeatMsg;
 }
 
 /**
  * @desc Writes (queues) all primary-to-secondary teensy specific information to the CAN bus
+ * @return The packaged message of type CAN_message_t
  */
-void canPrimary2Secondary() {
+CAN_message_t canGetPrimary2Secondary() {
   // payload format (MSB to LSB): state (matches fsm state enum), profile, speed,
-  // throttleVoltage[1], throttleVoltage[0]
+  //    throttleVoltage[1], throttleVoltage[0]
   static CAN_message_t p2sMsg = { // p2s=primary to secondary
     cobid_p2s, 0, 5, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
@@ -265,16 +226,17 @@ void canPrimary2Secondary() {
   p2sMsg.buf[3] = (g_vehicle.dynamics.throttleVoltage >> 8) & 0xff; // MSB
   p2sMsg.buf[4] = (g_vehicle.dynamics.throttleVoltage) & 0xff; // LSB
 
-  // enqueue the packet to be written to the CAN bus
-  g_canTxQueue.PushBack(p2sMsg);
+  // return the packed/formatted message
+  return p2sMsg;
 }
 
 /**
  * @desc From the perspective of the Primary Teensy..TPDO 5 maps to RPDO 5 on Master
  * @param throttleVoltage The current, cleaned throttle voltage to be sent to Master
  * @param forwardSwitch A boolean corresponding to moving forward (must be 1 bit)
+ * @return The packaged message of type CAN_message_t
  */
-void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
+CAN_message_t canGetThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
   // throttle message formate with: COB-ID=0x241, len=7
   // static uint8_t throttleMsgPayload[8] = {0,0,0,0,0,0,0,0};
   static CAN_message_t throttleMsg = {
@@ -289,5 +251,5 @@ void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
   throttleMsg.buf[6] = (forwardSwitch & 0x1) << 7; // sets byte as: on=0x80, off=0x00
 
   // enqueue the new value to be written to CAN bus
-  g_canTxQueue.PushBack(throttleMsg);
+  return throttleMsg;
 }
