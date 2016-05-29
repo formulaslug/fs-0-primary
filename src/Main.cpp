@@ -20,6 +20,7 @@ void _3msISR();
 void canTx();
 void canRx();
 void canHeartbeat();
+void canPrimary2Secondary();
 void updateThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch);
 
 static CANopen* g_canBus = nullptr;
@@ -173,6 +174,8 @@ void _100msISR() {
   canHeartbeat();
   // enqueue throttle voltage periodically as well
   updateThrottleTPDO(g_vehicle.dynamics.throttleVoltage, 1);
+  // enqueue primary-to-secondary message
+  canPrimary2Secondary();
 }
 
 /**
@@ -243,9 +246,27 @@ void canHeartbeat() {
 }
 
 /**
- * @desc Writes (queues) all teensy<->teensy specific information to the CAN bus
+ * @desc Writes (queues) all primary-to-secondary teensy specific information to the CAN bus
  */
-void canTeensy2Teensy() {
+void canPrimary2Secondary() {
+  // payload format (MSB to LSB): state (matches fsm state enum), profile, speed,
+  // throttleVoltage[1], throttleVoltage[0]
+  static CAN_message_t p2sMsg = { // p2s=primary to secondary
+    cobid_p2s, 0, 5, 0, {0, 0, 0, 0, 0, 0, 0, 0}
+  };
+
+  // insert current state
+  p2sMsg.buf[0] = g_vehicle.state;
+  // insert current profile
+  p2sMsg.buf[1] = g_vehicle.dynamics.driveProfile;
+  // insert current speed
+  p2sMsg.buf[2] = g_vehicle.dynamics.speed;
+  // insert current throttleVoltage
+  p2sMsg.buf[3] = (g_vehicle.dynamics.throttleVoltage >> 8) & 0xff; // MSB
+  p2sMsg.buf[4] = (g_vehicle.dynamics.throttleVoltage) & 0xff; // LSB
+
+  // enqueue the packet to be written to the CAN bus
+  g_canTxQueue.PushBack(p2sMsg);
 }
 
 /**

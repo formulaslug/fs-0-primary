@@ -26,6 +26,12 @@ enum States {
   RTD_SHUTDOWN,
 };
 
+enum DriveProfiles {
+  SAFE, // restricted performace (pre-op)
+  ENDURANCE, // competition ready: endurance mode
+  SPORT // competition ready: insane mode?
+};
+
 enum Leds {
   BLUE,
   YELLOW,
@@ -52,7 +58,8 @@ class Vehicle {
   struct Dynamics {
     uint16_t throttleVoltage = 1;
     uint16_t speed;
-    uint8_t topSpeed = 60;
+    uint8_t maxSpeed = 60;
+    uint8_t driveProfile = SAFE;
   };
 
   Dynamics dynamics;
