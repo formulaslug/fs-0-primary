@@ -153,7 +153,7 @@ int main() {
  */
 void _1sISR() {
   // enqueue heartbeat message to g_canTxQueue
-  g_canBus->queueTx(canGetHeartbeat());
+  g_canBus->queueTxMsg(canGetHeartbeat());
 }
 
 /**
@@ -161,9 +161,10 @@ void _1sISR() {
  */
 void _100msISR() {
   // enqueue throttle voltage periodically as well
-  g_canBus->queueTx(canGetThrottleTPDO(g_vehicle.dynamics.throttleVoltage, 1));
+  g_canBus->queueTxMsg(canGetThrottleTPDO(g_vehicle.dynamics.throttleVoltage,
+                                          1));
   // enqueue primary-to-secondary message
-  g_canBus->queueTx(canGetPrimary2Secondary());
+  g_canBus->queueTxMsg(canGetPrimary2Secondary());
 }
 
 /**
