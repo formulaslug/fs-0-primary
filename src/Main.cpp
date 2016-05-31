@@ -153,7 +153,7 @@ int main() {
  */
 void _1sISR() {
   // enqueue heartbeat message to g_canTxQueue
-  g_canBus->queueTxMsg(canGetHeartbeat());
+  g_canBus->queueTxMessage(canGetHeartbeat());
 }
 
 /**
@@ -161,24 +161,24 @@ void _1sISR() {
  */
 void _100msISR() {
   // enqueue throttle voltage periodically as well
-  g_canBus->queueTxMsg(canGetThrottleTPDO(g_vehicle.dynamics.throttleVoltage,
+  g_canBus->queueTxMessage(canGetThrottleTPDO(g_vehicle.dynamics.throttleVoltage,
                                           1));
   // enqueue primary-to-secondary message
-  g_canBus->queueTxMsg(canGetPrimary2Secondary());
+  g_canBus->queueTxMessage(canGetPrimary2Secondary());
 }
 
 /**
  * @desc Processes and transmits all messages in g_canTxQueue
  */
 void _20msISR() {
-  g_canBus->processTx();
+  g_canBus->processTxMessages();
 }
 
 /**
  * @desc Processes all received CAN messages into g_canRxQueue
  */
 void _3msISR() {
-  g_canBus->processRx();
+  g_canBus->processRxMessages();
 }
 
 /**
@@ -188,22 +188,22 @@ void _3msISR() {
 CAN_message_t canGetHeartbeat() {
   static bool didInit = false;
   // heartbeat message formatted with: COB-ID=0x001, len=2
-  static CAN_message_t heartbeatMsg = {
+  static CAN_message_t heartbeatMessage = {
     cobid_node3Heartbeat, 0, 2, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
 
   // insert the heartbeat payload on the first call
   if (!didInit) {
-    // TODO: add this statically into the initialization of heartbeatMsg
+    // TODO: add this statically into the initialization of heartbeatMessage
     // populate payload (only once)
     for (uint32_t i = 0; i < 2; ++i) {
       // set in message buff, each byte of the message, from least to most significant
-      heartbeatMsg.buf[i] = (payload_heartbeat >> ((1 - i) * 8)) & 0xff;
+      heartbeatMessage.buf[i] = (payload_heartbeat >> ((1 - i) * 8)) & 0xff;
     }
     didInit = true;
   }
   // return the packed/formatted message
-  return heartbeatMsg;
+  return heartbeatMessage;
 }
 
 /**
@@ -213,22 +213,22 @@ CAN_message_t canGetHeartbeat() {
 CAN_message_t canGetPrimary2Secondary() {
   // payload format (MSB to LSB): state (matches fsm state enum), profile, speed,
   //    throttleVoltage[1], throttleVoltage[0]
-  static CAN_message_t p2sMsg = { // p2s=primary to secondary
+  static CAN_message_t p2sMessage = { // p2s=primary to secondary
     cobid_p2s, 0, 5, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
 
   // insert current state
-  p2sMsg.buf[0] = g_vehicle.state;
+  p2sMessage.buf[0] = g_vehicle.state;
   // insert current profile
-  p2sMsg.buf[1] = g_vehicle.dynamics.driveProfile;
+  p2sMessage.buf[1] = g_vehicle.dynamics.driveProfile;
   // insert current speed
-  p2sMsg.buf[2] = g_vehicle.dynamics.speed;
+  p2sMessage.buf[2] = g_vehicle.dynamics.speed;
   // insert current throttleVoltage
-  p2sMsg.buf[3] = (g_vehicle.dynamics.throttleVoltage >> 8) & 0xff; // MSB
-  p2sMsg.buf[4] = (g_vehicle.dynamics.throttleVoltage) & 0xff; // LSB
+  p2sMessage.buf[3] = (g_vehicle.dynamics.throttleVoltage >> 8) & 0xff; // MSB
+  p2sMessage.buf[4] = (g_vehicle.dynamics.throttleVoltage) & 0xff; // LSB
 
   // return the packed/formatted message
-  return p2sMsg;
+  return p2sMessage;
 }
 
 /**
@@ -239,18 +239,18 @@ CAN_message_t canGetPrimary2Secondary() {
  */
 CAN_message_t canGetThrottleTPDO(uint16_t throttleVoltage, uint8_t forwardSwitch) {
   // throttle message formate with: COB-ID=0x241, len=7
-  // static uint8_t throttleMsgPayload[8] = {0,0,0,0,0,0,0,0};
-  static CAN_message_t throttleMsg = {
+  // static uint8_t throttleMessagePayload[8] = {0,0,0,0,0,0,0,0};
+  static CAN_message_t throttleMessage = {
     cobid_TPDO5, 0, 7, 0, {0, 0, 0, 0, 0, 0, 0, 0}
   };
 
   // insert new throttle voltage value
-  throttleMsg.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB
-  throttleMsg.buf[1] = (throttleVoltage) & 0xff; // LSB
+  throttleMessage.buf[0] = (throttleVoltage >> 8) & 0xff; // MSB
+  throttleMessage.buf[1] = (throttleVoltage) & 0xff; // LSB
 
   // insert new forward switch value
-  throttleMsg.buf[6] = (forwardSwitch & 0x1) << 7; // sets byte as: on=0x80, off=0x00
+  throttleMessage.buf[6] = (forwardSwitch & 0x1) << 7; // sets byte as: on=0x80, off=0x00
 
   // enqueue the new value to be written to CAN bus
-  return throttleMsg;
+  return throttleMessage;
 }
