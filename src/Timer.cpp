@@ -1,9 +1,11 @@
+// Copyright (c) Formula Slug 2016. All Rights Reserved.
+
 #include "Timer.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
-  #include "Arduino.h"
+#include "Arduino.h"
 #else
-  #include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 Timer::Timer(uint32_t timeout) : m_timeout(timeout) {

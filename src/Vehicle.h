@@ -1,7 +1,10 @@
+// Copyright (c) Formula Slug 2016. All Rights Reserved.
+
 #ifndef VEHICLE_H
 #define VEHICLE_H
 
-#include <cstdint>
+#include <stdint.h>
+
 #include <array>
 
 constexpr uint8_t k_numLEDs = 5;
@@ -27,27 +30,16 @@ enum States {
 };
 
 enum DriveProfiles {
-  SAFE, // restricted performace (pre-op)
-  ENDURANCE, // competition ready: endurance mode
-  SPORT // competition ready: insane mode?
+  SAFE,       // restricted performace (pre-op)
+  ENDURANCE,  // competition ready: endurance mode
+  SPORT       // competition ready: insane mode?
 };
 
-enum Leds {
-  BLUE,
-  YELLOW,
-  RED,
-  STATUS_LED,
-  SPEED
-};
+enum Leds { BLUE, YELLOW, RED, STATUS_LED, SPEED };
 
-enum Buttons {
-  HV_TOGGLE,
-  RTD_TOGGLE
-};
+enum Buttons { HV_TOGGLE, RTD_TOGGLE };
 
-enum AnalogInputs {
-  THROTTLE_VOLTAGE
-};
+enum AnalogInputs { THROTTLE_VOLTAGE };
 
 class Vehicle {
  public:
@@ -68,4 +60,4 @@ class Vehicle {
   std::array<uint8_t, k_numLEDs> ledStates;
 };
 
-#endif // VEHICLE_H
+#endif  // VEHICLE_H
