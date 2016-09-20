@@ -10,21 +10,21 @@
 
 Timer::Timer(uint32_t timeout) : m_timeout(timeout) {
   m_count = timeout;
-  m_previous_millis = millis();
+  m_previousMillis = millis();
 }
 
 void Timer::update() {
-  if (millis() - m_previous_millis >= m_interval_millis) {
+  if (millis() - m_previousMillis >= m_intervalMillis) {
     // As suggested by benjamin.soelberg@gmail.com, the following line
-    // m_previous_millis = millis();
+    // m_previousMillis = millis();
     // was changed to
-    // m_previous_millis += m_interval_millis;
+    // m_previousMillis += m_intervalMillis;
 
     // If the interval is set to 0 we revert to the original behavior
-    if (m_interval_millis <= 0 || m_autoreset) {
-      m_previous_millis = millis();
+    if (m_intervalMillis <= 0 || m_autoreset) {
+      m_previousMillis = millis();
     } else {
-      m_previous_millis += m_interval_millis;
+      m_previousMillis += m_intervalMillis;
     }
 
     if (m_count != 0) {

@@ -18,7 +18,7 @@ class Timer {
   uint32_t m_count;
 
   uint8_t m_autoreset = 0;
-  uint32_t m_previous_millis, m_interval_millis = 1;
+  uint32_t m_previousMillis, m_intervalMillis = 1;
 };
 
 #endif  // TIMER_H
