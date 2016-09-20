@@ -7,11 +7,10 @@
 
 // TODO: Need some button debounce
 
+#include <IntervalTimer.h>
 #include <stdint.h>
 
 #include <array>
-
-#include <IntervalTimer.h>
 
 #include "Vehicle.h"
 #include "core_controls/CANopen.h"
