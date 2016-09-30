@@ -14,6 +14,7 @@
 
 #include "Vehicle.h"
 #include "core_controls/CANopen.h"
+#include "core_controls/InterruptMutex.h"
 
 // timer interrupt handlers
 void _1sISR();
@@ -64,13 +65,17 @@ int main() {
   IntervalTimer _3msInterrupt;
   _3msInterrupt.begin(_3msISR, 3000);
 
+  InterruptMutex interruptMut;
+
   while (1) {
-    cli();
-    // print all transmitted messages
-    g_canBus->printTxAll();
-    // print all received messages
-    g_canBus->printRxAll();
-    sei();
+    {
+      std::lock_guard<InterruptMutex> lock(interruptMut);
+
+      // print all transmitted messages
+      g_canBus->printTxAll();
+      // print all received messages
+      g_canBus->printRxAll();
+    }
 
     // (TEMPORARY) Update all analog inputs readings. In production, this will
     // go in the fsm
