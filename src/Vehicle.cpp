@@ -4,7 +4,7 @@
 
 Vehicle::Vehicle() {
   for (auto& led : ledStates) {
-    led = LED_OFF;
+    led = kLEDOff;
   }
-  ledStates[STATUS_LED] = ON;
+  ledStates[kStatusLED] = kOn;
 }

@@ -35,7 +35,7 @@ static CANopen* g_canBus = nullptr;
 static Vehicle g_vehicle;
 
 int main() {
-  const std::array<uint8_t, k_numButtons> buttonPins{7, 8};
+  const std::array<uint8_t, kNumButtons> buttonPins{7, 8};
   const std::array<uint8_t, 1> analogInputPins{9};
 
   Serial.begin(115200);
@@ -49,9 +49,9 @@ int main() {
     pinMode(inputPin, INPUT);
   }
 
-  constexpr uint32_t k_ID = 0x680;
-  constexpr uint32_t k_baudRate = 250000;
-  g_canBus = new CANopen(k_ID, k_baudRate);
+  constexpr uint32_t kID = 0x680;
+  constexpr uint32_t kBaudRate = 250000;
+  g_canBus = new CANopen(kID, kBaudRate);
 
   IntervalTimer _1sInterrupt;
   _1sInterrupt.begin(_1sISR, 1000000);
@@ -82,79 +82,79 @@ int main() {
     // TODO: clean this input and give a leeway of 3 or 4 before setting the new
     // value
     g_vehicle.dynamics.throttleVoltage =
-        analogRead(analogInputPins[THROTTLE_VOLTAGE]);
+        analogRead(analogInputPins[kThrottleVoltage]);
 
     // Vehicle's main state machine (FSM)
     switch (g_vehicle.state) {
-      case LV_STARTUP:
-        // Perform LV_STARTUP functions HERE
-        g_vehicle.state = LV_ACTIVE;
+      case kLVStartup:
+        // Perform kLVStartup functions HERE
+        g_vehicle.state = kLVActive;
         break;
-      case LV_ACTIVE:
+      case kLVActive:
         // Set LED feedback
-        g_vehicle.ledStates[BLUE] = LED_ON;
-        g_vehicle.ledStates[YELLOW] = LED_OFF;
-        g_vehicle.ledStates[RED] = LED_OFF;
+        g_vehicle.ledStates[kBlue] = kLEDOn;
+        g_vehicle.ledStates[kYellow] = kLEDOff;
+        g_vehicle.ledStates[kRed] = kLEDOff;
 
-        // Wait to move to HV_STARTUP
-        if (digitalReadFast(buttonPins[HV_TOGGLE]) == LOW) {
-          g_vehicle.state = HV_STARTUP;
+        // Wait to move to kHVStartup
+        if (digitalReadFast(buttonPins[kHVToggle]) == LOW) {
+          g_vehicle.state = kHVStartup;
         }
         break;
-      case HV_SHUTDOWN:
-        // Perform HV_SHUTDOWN functions HERE
+      case kHVShutdown:
+        // Perform kHVShutdown functions HERE
 
-        // Transition to LV_ACTIVE
-        g_vehicle.state = LV_ACTIVE;
+        // Transition to kLVActive
+        g_vehicle.state = kLVActive;
         break;
-      case HV_STARTUP:
-        // Perform LV_STARTUP functions HERE
+      case kHVStartup:
+        // Perform kLVStartup functions HERE
 
-        g_vehicle.state = HV_ACTIVE;
+        g_vehicle.state = kHVActive;
         break;
-      case HV_ACTIVE:
+      case kHVActive:
         // Set LED feedback
-        g_vehicle.ledStates[BLUE] = LED_ON;
-        g_vehicle.ledStates[YELLOW] = LED_ON;
-        g_vehicle.ledStates[RED] = LED_OFF;
+        g_vehicle.ledStates[kBlue] = kLEDOn;
+        g_vehicle.ledStates[kYellow] = kLEDOn;
+        g_vehicle.ledStates[kRed] = kLEDOff;
 
-        // Wait to move to RTD_STARTUP until user input
-        if (digitalReadFast(buttonPins[RTD_TOGGLE]) == LOW) {
-          g_vehicle.state = RTD_STARTUP;
-        } else if (digitalReadFast(buttonPins[HV_TOGGLE]) == LOW) {
+        // Wait to move to kRTDStartup until user input
+        if (digitalReadFast(buttonPins[kRTDToggle]) == LOW) {
+          g_vehicle.state = kRTDStartup;
+        } else if (digitalReadFast(buttonPins[kHVToggle]) == LOW) {
           // Or move back to LV active
-          g_vehicle.state = HV_SHUTDOWN;
+          g_vehicle.state = kHVShutdown;
         }
         break;
-      case RTD_SHUTDOWN:
-        // Perform HV_SHUTDOWN functions HERE
+      case kRTDShutdown:
+        // Perform kHVShutdown functions HERE
 
-        g_vehicle.state = HV_ACTIVE;
+        g_vehicle.state = kHVActive;
         break;
-      case RTD_STARTUP:
-        // Perform LV_STARTUP functions HERE
+      case kRTDStartup:
+        // Perform kLVStartup functions HERE
 
         // Show entire system is hot
-        g_vehicle.ledStates[BLUE] = LED_ON;
-        g_vehicle.ledStates[YELLOW] = LED_ON;
-        g_vehicle.ledStates[RED] = LED_ON;
+        g_vehicle.ledStates[kBlue] = kLEDOn;
+        g_vehicle.ledStates[kYellow] = kLEDOn;
+        g_vehicle.ledStates[kRed] = kLEDOn;
 
-        g_vehicle.state = RTD_ACTIVE;
+        g_vehicle.state = kRTDActive;
         break;
-      case RTD_ACTIVE:
+      case kRTDActive:
         // update current throttle voltage
         g_vehicle.dynamics.throttleVoltage =
-            analogRead(analogInputPins[THROTTLE_VOLTAGE]);
+            analogRead(analogInputPins[kThrottleVoltage]);
 
         // Show speed
-        g_vehicle.ledStates[SPEED] = ~g_vehicle.ledStates[SPEED];
+        g_vehicle.ledStates[kSpeed] = ~g_vehicle.ledStates[kSpeed];
 
         // Wait to transition back
-        if (digitalReadFast(buttonPins[RTD_TOGGLE]) == LOW) {
+        if (digitalReadFast(buttonPins[kRTDToggle]) == LOW) {
           // Start moving back to HV_ACTIVE
-          g_vehicle.ledStates[SPEED] = LED_OFF;
+          g_vehicle.ledStates[kSpeed] = kLEDOff;
           g_vehicle.dynamics.throttleVoltage = 1;
-          g_vehicle.state = RTD_SHUTDOWN;
+          g_vehicle.state = kRTDShutdown;
         }
         break;
     }
@@ -198,7 +198,7 @@ CAN_message_t canGetHeartbeat() {
   static bool didInit = false;
   // heartbeat message formatted with: COB-ID=0x001, len=2
   static CAN_message_t heartbeatMessage = {
-      cobid_node3Heartbeat, 0, 2, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
+      kCobid_node3Heartbeat, 0, 2, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
 
   // insert the heartbeat payload on the first call
   if (!didInit) {
@@ -207,7 +207,7 @@ CAN_message_t canGetHeartbeat() {
     for (uint32_t i = 0; i < 2; ++i) {
       // set in message buff, each byte of the message, from least to most
       // significant
-      heartbeatMessage.buf[i] = (payload_heartbeat >> ((1 - i) * 8)) & 0xff;
+      heartbeatMessage.buf[i] = (kPayloadHeartbeat >> ((1 - i) * 8)) & 0xff;
     }
     didInit = true;
   }
@@ -225,7 +225,7 @@ CAN_message_t canGetPrimary2Secondary() {
   // speed,
   //    throttleVoltage[1], throttleVoltage[0]
   static CAN_message_t p2sMessage = {// p2s=primary to secondary
-                                     cobid_p2s,
+                                     kCobid_p2s,
                                      0,
                                      5,
                                      0,
@@ -259,7 +259,7 @@ CAN_message_t canGetThrottleTPDO(uint16_t throttleVoltage,
   // throttle message formate with: COB-ID=0x241, len=7
   // static uint8_t throttleMessagePayload[8] = {0,0,0,0,0,0,0,0};
   static CAN_message_t throttleMessage = {
-      cobid_TPDO5, 0, 7, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
+      kCobid_TPDO5, 0, 7, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
 
   // insert new throttle voltage value
   throttleMessage.buf[0] = (throttleVoltage >> 8) & 0xff;  // MSB
