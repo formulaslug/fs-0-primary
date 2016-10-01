@@ -263,7 +263,7 @@ CAN_message_t canGetThrottleTPDO(uint16_t throttleVoltage,
 
   // insert new throttle voltage value
   throttleMessage.buf[0] = (throttleVoltage >> 8) & 0xff;  // MSB
-  throttleMessage.buf[1] = (throttleVoltage)&0xff;         // LSB
+  throttleMessage.buf[1] = throttleVoltage & 0xff;         // LSB
 
   // insert new forward switch value
   throttleMessage.buf[6] = (forwardSwitch & 0x1)
