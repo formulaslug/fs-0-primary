@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <array>
+#include <memory>
 
 #include <IntervalTimer.h>
 
@@ -17,6 +18,7 @@
 #include "core_controls/CANopen.h"
 #include "core_controls/CANopenPDO.h"
 #include "core_controls/InterruptMutex.h"
+#include "core_controls/make_unique.h"
 
 // timer interrupt handlers
 void _1sISR();
@@ -25,7 +27,7 @@ void _20msISR();
 void _3msISR();
 
 // contains and controls all CAN related functions
-static CANopen* g_canBus = nullptr;
+static std::unique_ptr<CANopen> g_canBus;
 
 // global vehicle so that properties can be accessed from within ISRs
 static Vehicle g_vehicle;
@@ -74,7 +76,7 @@ int main() {
 
   constexpr uint32_t kID = 0x680;
   constexpr uint32_t kBaudRate = 250000;
-  g_canBus = new CANopen(kID, kBaudRate);
+  g_canBus = std::make_unique<CANopen>(kID, kBaudRate);
 
   IntervalTimer _1sInterrupt;
   _1sInterrupt.begin(_1sISR, 1000000);
@@ -189,7 +191,7 @@ int main() {
  */
 void _1sISR() {
   // enqueue heartbeat message to g_canTxQueue
-  HeartbeatMessage heartbeatMessage(kCobid_node3Heartbeat);
+  const HeartbeatMessage heartbeatMessage(kCobid_node3Heartbeat);
   g_canBus->queueTxMessage(heartbeatMessage);
 }
 
@@ -203,7 +205,7 @@ void _100msISR() {
   bool driveButton = digitalReadFast(23);
 
   // enqueue throttle voltage periodically as well
-  ThrottleMessage throttleMessage(65536 * throttle, driveButton);
+  const ThrottleMessage throttleMessage(65536 * throttle, driveButton);
   g_canBus->queueTxMessage(throttleMessage);
 }
 
