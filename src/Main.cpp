@@ -59,7 +59,7 @@ int main() {
 
   // Turn off startup sound
   pinMode(20, OUTPUT);
-  digitalWriteFast(20, OUTPUT);
+  digitalWriteFast(20, LOW);
 
   // Turn off brake light
   pinMode(21, OUTPUT);
