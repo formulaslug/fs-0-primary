@@ -35,10 +35,10 @@ endif
 TOOLSPATH := $(ARDUINOPATH)/hardware/tools
 
 # path location for Teensy 3 core
-COREPATH = $(CURDIR)/src/core_controls/core
+COREPATH = $(CURDIR)/src/fs-0-core/core
 
 # path location for Arduino libraries
-LIBRARYPATH = $(CURDIR)/src/core_controls/libs
+LIBRARYPATH = $(CURDIR)/src/fs-0-core/libs
 
 #************************************************************************
 # Settings below this point usually do not need to be edited

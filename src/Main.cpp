@@ -15,10 +15,10 @@
 #include <IntervalTimer.h>
 
 #include "Vehicle.h"
-#include "core_controls/CANopen.h"
-#include "core_controls/CANopenPDO.h"
-#include "core_controls/InterruptMutex.h"
-#include "core_controls/make_unique.h"
+#include "fs-0-core/CANopen.h"
+#include "fs-0-core/CANopenPDO.h"
+#include "fs-0-core/InterruptMutex.h"
+#include "fs-0-core/make_unique.h"
 
 // timer interrupt handlers
 void _1sISR();
