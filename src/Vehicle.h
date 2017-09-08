@@ -1,7 +1,6 @@
 // Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
 
-#ifndef VEHICLE_H
-#define VEHICLE_H
+#pragma once
 
 #include <stdint.h>
 
@@ -59,5 +58,3 @@ class Vehicle {
   // LED values are 0x00 or 0xff to allow for bitwise not
   std::array<uint8_t, kNumLEDs> ledStates;
 };
-
-#endif  // VEHICLE_H

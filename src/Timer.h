@@ -1,7 +1,6 @@
 // Copyright (c) 2016-2017 Formula Slug. All Rights Reserved.
 
-#ifndef TIMER_H
-#define TIMER_H
+#pragma once
 
 #include <stdint.h>
 
@@ -20,5 +19,3 @@ class Timer {
   uint8_t m_autoreset = 0;
   uint32_t m_previousMillis, m_intervalMillis = 1;
 };
-
-#endif  // TIMER_H
