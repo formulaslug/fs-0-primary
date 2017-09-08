@@ -9,5 +9,4 @@ cppSrcFileInclude {
 
 modifiableFileExclude {
   build/
-  fs-0-core/
 }
